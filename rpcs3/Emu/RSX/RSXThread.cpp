@@ -34,14 +34,14 @@ namespace rsx
 
 	u32 get_address(u32 offset, u32 location)
 	{
-
+		offset &= 0x7FFFFFFF;
 		switch (location)
 		{
 		case CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER:
 		case CELL_GCM_LOCATION_LOCAL:
 		{
 			// TODO: Don't use unnamed constants like 0xC0000000
-			return 0xC0000000 + offset;
+			return 0xC0000000 | (offset & 0xFFFFFFF);
 		}
 
 		case CELL_GCM_CONTEXT_DMA_MEMORY_HOST_BUFFER:
@@ -1367,7 +1367,7 @@ namespace rsx
 		for (auto &info : result.interleaved_blocks)
 		{
 			//Calculate real data address to be used during upload
-			info.real_offset_address = state.vertex_data_base_offset() + rsx::get_address(info.base_offset, info.memory_location);
+			info.real_offset_address = rsx::get_address(info.base_offset + state.vertex_data_base_offset(), info.memory_location);
 		}
 
 		return result;

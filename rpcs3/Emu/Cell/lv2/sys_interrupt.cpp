@@ -154,5 +154,5 @@ void sys_interrupt_thread_eoi(ppu_thread& ppu)
 
 	sys_interrupt.trace("sys_interrupt_thread_eoi()");
 
-	ppu.state += cpu_flag::ret;
+	//ppu.state += cpu_flag::ret;
 }
