@@ -177,6 +177,8 @@ namespace rsx
 
 	std::array<float, 4> get_constant_blend_colors();
 
+	void convert_f32_to_d24(void *dst, void *src, u32 row_length_in_texels, u32 num_rows);
+
 	/**
 	 * Shuffle texel layout from xyzw to wzyx
 	 * TODO: Variable src/dst and optional se conversion

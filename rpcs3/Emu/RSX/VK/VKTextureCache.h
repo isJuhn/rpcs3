@@ -183,15 +183,16 @@ namespace vk
 				break;
 			}
 
+			//TODO: Read back stencil values (is this really necessary?)
 			VkBufferImageCopy copyRegion = {};
 			copyRegion.bufferOffset = 0;
 			copyRegion.bufferRowLength = internal_width;
 			copyRegion.bufferImageHeight = internal_height;
-			copyRegion.imageSubresource = {aspect_flag, 0, 0, 1};
+			copyRegion.imageSubresource = {aspect_flag & ~(VK_IMAGE_ASPECT_STENCIL_BIT), 0, 0, 1};
 			copyRegion.imageOffset = {};
 			copyRegion.imageExtent = {internal_width, internal_height, 1};
 
-			VkImageSubresourceRange subresource_range = { aspect_flag & ~(VK_IMAGE_ASPECT_STENCIL_BIT), 0, 1, 0, 1 };
+			VkImageSubresourceRange subresource_range = { aspect_flag, 0, 1, 0, 1 };
 			
 			VkImageLayout layout = vram_texture->current_layout;
 			change_image_layout(cmd, vram_texture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresource_range);
@@ -327,6 +328,12 @@ namespace vk
 			}
 
 			dma_buffer->unmap();
+
+			if (vram_texture->info.format == VK_FORMAT_D32_SFLOAT_S8_UINT)
+			{
+				//Convert f32 data read back to d24
+				rsx::convert_f32_to_d24(pixels_dst, pixels_dst, cpu_address_range, 1);
+			}
 
 			//Its highly likely that this surface will be reused, so we just leave resources in place
 			return result;

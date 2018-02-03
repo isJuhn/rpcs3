@@ -419,7 +419,9 @@ namespace vk
 	{
 		if (image->info.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
 		{
-			insert_texture_barrier(cmd, image->value, image->current_layout, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
+			VkImageAspectFlags aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+			if (image->info.format != VK_FORMAT_D16_UNORM) aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			insert_texture_barrier(cmd, image->value, image->current_layout, { aspect, 0, 1, 0, 1 });
 		}
 		else
 		{

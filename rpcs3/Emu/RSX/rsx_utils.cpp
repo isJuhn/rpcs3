@@ -363,4 +363,17 @@ namespace rsx
 			}
 		}
 	}
+
+	void convert_f32_to_d24(void *dst, void *src, u32 row_length_in_texels, u32 num_rows)
+	{
+		//TODO: Optimize this with sse/avx
+		be_t<u32>* casted_dst = (be_t<u32>*)dst;
+		be_t<f32>* casted_src = (be_t<f32>*)src;
+
+		const u32 num_pixels = row_length_in_texels * num_rows;
+		for (u32 n = 0; n < num_pixels; ++n)
+		{
+			casted_dst[n] = (u32)(casted_src[n] * 0x7FFFFFFF);
+		}
+	}
 }
