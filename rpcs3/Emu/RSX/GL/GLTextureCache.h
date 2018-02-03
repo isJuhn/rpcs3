@@ -252,6 +252,12 @@ namespace gl
 			real_pitch = 0;
 		}
 
+		void make_flushable()
+		{
+			verify(HERE), pbo_id == 0;
+			init_buffer();
+		}
+
 		void set_dimensions(u32 width, u32 height, u32 /*depth*/, u32 pitch)
 		{
 			this->width = width;
@@ -301,7 +307,8 @@ namespace gl
 			}
 
 			u32 target_texture = vram_texture;
-			if (real_pitch != rsx_pitch || rsx::get_resolution_scale_percent() != 100)
+			if ((rsx::get_resolution_scale_percent() != 100 && context == rsx::texture_upload_context::framebuffer_storage) ||
+				(real_pitch != rsx_pitch))
 			{
 				u32 real_width = width;
 				u32 real_height = height;
@@ -449,6 +456,13 @@ namespace gl
 			//throw if map failed since we'll segfault anyway
 			verify(HERE), data != nullptr;
 
+			bool require_manual_shuffle = false;
+			if (pack_unpack_swap_bytes)
+			{
+				if (type == gl::texture::type::sbyte || type == gl::texture::type::ubyte)
+					require_manual_shuffle = true;
+			}
+
 			if (real_pitch >= rsx_pitch || scaled_texture != 0)
 			{
 				memcpy(dst, data, cpu_address_range);
@@ -459,6 +473,12 @@ namespace gl
 				const u8 samples_u = (aa_mode == rsx::surface_antialiasing::center_1_sample) ? 1 : 2;
 				const u8 samples_v = (aa_mode == rsx::surface_antialiasing::square_centered_4_samples || aa_mode == rsx::surface_antialiasing::square_rotated_4_samples) ? 2 : 1;
 				rsx::scale_image_nearest(dst, const_cast<const void*>(data), width, height, rsx_pitch, real_pitch, pixel_size, samples_u, samples_v);
+			}
+
+			if (require_manual_shuffle)
+			{
+				//byte swapping does not work on byte types, use uint_8_8_8_8 for rgba8 instead to avoid penalty
+				rsx::shuffle_texel_data_wzyx<u8>(dst, rsx_pitch, width, height);
 			}
 
 			glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
@@ -784,13 +804,31 @@ namespace gl
 			cached.set_sampler_status(rsx::texture_sampler_status::status_uninitialized);
 			cached.set_image_type(type);
 
-			//Its not necessary to lock blit dst textures as they are just reused as necessary
-			if (context != rsx::texture_upload_context::blit_engine_dst || g_cfg.video.strict_rendering_mode)
+			if (context != rsx::texture_upload_context::blit_engine_dst)
 			{
 				cached.protect(utils::protection::ro);
-				update_cache_tag();
+			}
+			else
+			{
+				//TODO: More tests on byte order
+				//ARGB8+native+unswizzled is confirmed with Dark Souls II character preview
+				if (gcm_format == CELL_GCM_TEXTURE_A8R8G8B8)
+				{
+					bool bgra = (flags == rsx::texture_create_flags::native_component_order);
+					cached.set_format(bgra? gl::texture::format::bgra : gl::texture::format::rgba, gl::texture::type::uint_8_8_8_8, false);
+				}
+				else
+				{
+					cached.set_format(gl::texture::format::rgb, gl::texture::type::ushort_5_6_5, true);
+				}
+
+				cached.make_flushable();
+				cached.set_dimensions(width, height, depth, (rsx_size / height));
+				cached.protect(utils::protection::no);
+				no_access_range = cached.get_min_max(no_access_range);
 			}
 
+			update_cache_tag();
 			return &cached;
 		}
 

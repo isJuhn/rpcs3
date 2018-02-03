@@ -332,6 +332,11 @@ namespace vk
 			return result;
 		}
 
+		void set_unpack_swap_bytes(bool swap_bytes)
+		{
+			pack_unpack_swap_bytes = swap_bytes;
+		}
+
 		void reprotect(utils::protection prot)
 		{
 			//Reset properties and protect again
@@ -740,13 +745,20 @@ namespace vk
 			region.set_image_type(type);
 
 			//Its not necessary to lock blit dst textures as they are just reused as necessary
-			if (context != rsx::texture_upload_context::blit_engine_dst || g_cfg.video.strict_rendering_mode)
+			if (context != rsx::texture_upload_context::blit_engine_dst)
 			{
 				region.protect(utils::protection::ro);
-				update_cache_tag();
+				read_only_range = region.get_min_max(read_only_range);
+			}
+			else
+			{
+				//TODO: Confirm byte swap patterns
+				region.protect(utils::protection::no);
+				region.set_unpack_swap_bytes(true);
+				no_access_range = region.get_min_max(no_access_range);
 			}
 
-			read_only_range = region.get_min_max(read_only_range);
+			update_cache_tag();
 			return &region;
 		}
 
