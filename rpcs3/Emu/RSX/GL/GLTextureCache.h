@@ -467,6 +467,13 @@ namespace gl
 			return true;
 		}
 
+		void reprotect(utils::protection prot)
+		{
+			flushed = false;
+			copied = false;
+			protect(prot);
+		}
+
 		void destroy()
 		{
 			if (!locked && pbo_id == 0 && vram_texture == 0 && m_fence.is_empty())

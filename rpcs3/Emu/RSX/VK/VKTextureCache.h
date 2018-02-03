@@ -332,6 +332,16 @@ namespace vk
 			return result;
 		}
 
+		void reprotect(utils::protection prot)
+		{
+			//Reset properties and protect again
+			flushed = false;
+			synchronized = false;
+			sync_timestamp = 0ull;
+
+			protect(prot);
+		}
+
 		bool is_synchronized() const
 		{
 			return synchronized;

@@ -23,6 +23,12 @@ namespace rsx
 		status_ready = 1
 	};
 
+	enum memory_read_flags
+	{
+		flush_always = 0,
+		flush_once = 1
+	};
+
 	struct cached_texture_section : public rsx::buffered_section
 	{
 		u16 width;
@@ -37,6 +43,7 @@ namespace rsx
 
 		u64 cache_tag = 0;
 
+		memory_read_flags readback_behaviour = memory_read_flags::flush_once;
 		rsx::texture_create_flags view_flags = rsx::texture_create_flags::default_component_order;
 		rsx::texture_upload_context context = rsx::texture_upload_context::shader_read;
 		rsx::texture_dimension_extended image_type = rsx::texture_dimension_extended::texture_dimension_2d;
@@ -97,6 +104,11 @@ namespace rsx
 			gcm_format = format;
 		}
 
+		void set_memory_read_flags(memory_read_flags flags)
+		{
+			readback_behaviour = flags;
+		}
+
 		u16 get_width() const
 		{
 			return width;
@@ -125,6 +137,11 @@ namespace rsx
 		u32 get_gcm_format() const
 		{
 			return gcm_format;
+		}
+
+		memory_read_flags get_memory_read_flags() const
+		{
+			return readback_behaviour;
 		}
 
 		rsx::texture_sampler_status get_sampler_status() const
@@ -156,6 +173,12 @@ namespace rsx
 				max_range = std::max(max_range, block_sz);
 				max_addr = std::max(max_addr, addr);
 				min_addr = std::min(min_addr, addr_base);
+				valid_count++;
+			}
+
+			void notify()
+			{
+				verify(HERE), valid_count >= 0;
 				valid_count++;
 			}
 
@@ -276,6 +299,9 @@ namespace rsx
 
 		//Set when a shader read-only texture data suddenly becomes contested, usually by fbo memory
 		bool read_only_tex_invalidate = false;
+
+		//Store of all objects in a flush_always state. A lazy readback is attempted every draw call
+		std::unordered_map<u32, section_storage_type*> m_flush_always_cache;
 
 		//Memory usage
 		const s32 m_max_zombie_objects = 64; //Limit on how many texture objects to keep around for reuse after they are invalidated
@@ -698,7 +724,7 @@ namespace rsx
 							if (!confirm_dimensions || tex.matches(rsx_address, width, height, depth, mipmaps))
 							{
 								if (!tex.is_locked() && tex.get_context() == texture_upload_context::framebuffer_storage)
-									range_data.notify(rsx_address, rsx_size);
+									range_data.notify();
 
 								return tex;
 							}
@@ -803,6 +829,27 @@ namespace rsx
 			region.set_sampler_status(rsx::texture_sampler_status::status_uninitialized);
 			region.set_image_type(rsx::texture_dimension_extended::texture_dimension_2d);
 			update_cache_tag();
+
+			region.set_memory_read_flags(memory_read_flags::flush_always);
+			m_flush_always_cache[memory_address] = &region;
+		}
+
+		void set_memory_read_flags(u32 memory_address, u32 memory_size, memory_read_flags flags)
+		{
+			writer_lock lock(m_cache_mutex);
+
+			if (flags != memory_read_flags::flush_always)
+				m_flush_always_cache.erase(memory_address);
+
+			section_storage_type& region = find_cached_texture(memory_address, memory_size, false);
+
+			if (!region.exists() || region.get_context() != texture_upload_context::framebuffer_storage)
+				return;
+
+			if (flags == memory_read_flags::flush_always)
+				m_flush_always_cache[memory_address] = &region;
+
+			region.set_memory_read_flags(flags);
 		}
 
 		template <typename ...Args>
@@ -1579,6 +1626,13 @@ namespace rsx
 			if (!g_cfg.video.use_gpu_texture_scaling && !(src_is_render_target || dst_is_render_target))
 				return false;
 
+			if (src.rsx_address < 0xcf700000 && src.rsx_address > 0xcc000000)
+			{
+				LOG_ERROR(RSX, "Blit from 0x%X -> 0x%X, src_rtt=%d, dst_rtt=%d", src.rsx_address, dst.rsx_address, src_is_render_target, dst_is_render_target);
+				if (src.rsx_address == 0xCF500000)
+					return false;
+			}
+
 			reader_lock lock(m_cache_mutex);
 
 			//Check if trivial memcpy can perform the same task
@@ -1867,6 +1921,24 @@ namespace rsx
 			blitter.scale_image(vram_texture, dest_texture, src_area, dst_area, interpolate, is_depth_blit);
 			notify_surface_changed(dst.rsx_address);
 			return true;
+		}
+
+		void do_update()
+		{
+			if (m_flush_always_cache.size())
+			{
+				writer_lock lock(m_cache_mutex);
+
+				for (auto &It : m_flush_always_cache)
+				{
+					if (It.second->get_protection() != utils::protection::no)
+					{
+						auto &range = m_cache[get_block_address(It.first)];
+						It.second->reprotect(utils::protection::no);
+						range.notify();
+					}
+				}
+			}
 		}
 
 		virtual const u32 get_unreleased_textures_count() const

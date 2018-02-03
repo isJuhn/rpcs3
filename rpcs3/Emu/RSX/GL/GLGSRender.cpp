@@ -1451,6 +1451,11 @@ void GLGSRender::do_local_task(bool /*idle*/)
 {
 	m_frame->clear_wm_events();
 
+	if (!in_begin_end)
+	{
+		m_gl_texture_cache.do_update();
+	}
+
 	std::lock_guard<std::mutex> lock(queue_guard);
 
 	if (!work_queue.empty())
