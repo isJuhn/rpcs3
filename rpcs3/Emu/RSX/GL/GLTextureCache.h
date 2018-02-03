@@ -90,7 +90,7 @@ namespace gl
 	{
 	private:
 		fence m_fence;
-		u32 pbo_id = 0;
+		//u32 pbo_id = 0;
 		u32 pbo_size = 0;
 
 		u32 vram_texture = 0;
@@ -173,18 +173,21 @@ namespace gl
 
 		void init_buffer()
 		{
+			const f32 resolution_scale = rsx::get_resolution_scale();
+			const u32 real_buffer_size = (resolution_scale < 1.f) ? cpu_address_range : (u32)(resolution_scale * resolution_scale * cpu_address_range);
+			const u32 buffer_size = align(real_buffer_size, 4096);
+
 			if (pbo_id)
 			{
+				if (pbo_size >= buffer_size)
+					return;
+
 				glDeleteBuffers(1, &pbo_id);
 				pbo_id = 0;
 				pbo_size = 0;
 			}
 
 			glGenBuffers(1, &pbo_id);
-
-			const f32 resolution_scale = rsx::get_resolution_scale();
-			const u32 real_buffer_size = (resolution_scale < 1.f)? cpu_address_range: (u32)(resolution_scale * resolution_scale * cpu_address_range);
-			const u32 buffer_size = align(real_buffer_size, 4096);
 
 			glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo_id);
 			glBufferStorage(GL_PIXEL_PACK_BUFFER, buffer_size, nullptr, GL_MAP_READ_BIT);
@@ -193,7 +196,7 @@ namespace gl
 		}
 
 	public:
-
+		u32 pbo_id = 0;
 		void reset(u32 base, u32 size, bool flushable=false)
 		{
 			rsx::protection_policy policy = g_cfg.video.strict_rendering_mode ? rsx::protection_policy::protect_policy_full_range : rsx::protection_policy::protect_policy_conservative;
@@ -254,7 +257,7 @@ namespace gl
 
 		void make_flushable()
 		{
-			verify(HERE), pbo_id == 0;
+			//verify(HERE), pbo_id == 0;
 			init_buffer();
 		}
 

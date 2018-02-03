@@ -723,8 +723,13 @@ namespace rsx
 						{
 							if (!confirm_dimensions || tex.matches(rsx_address, width, height, depth, mipmaps))
 							{
-								if (!tex.is_locked() && tex.get_context() == texture_upload_context::framebuffer_storage)
-									range_data.notify();
+								if (!tex.is_locked())
+								{
+									//Data is valid from cache pov but region has been unlocked and flushed
+									if (tex.get_context() == texture_upload_context::framebuffer_storage ||
+										tex.get_context() == texture_upload_context::blit_engine_dst)
+										range_data.notify();
+								}
 
 								return tex;
 							}
@@ -1626,13 +1631,6 @@ namespace rsx
 			if (!g_cfg.video.use_gpu_texture_scaling && !(src_is_render_target || dst_is_render_target))
 				return false;
 
-			if (src.rsx_address < 0xcf700000 && src.rsx_address > 0xcc000000)
-			{
-				LOG_ERROR(RSX, "Blit from 0x%X -> 0x%X, src_rtt=%d, dst_rtt=%d", src.rsx_address, dst.rsx_address, src_is_render_target, dst_is_render_target);
-				if (src.rsx_address == 0xCF500000)
-					return false;
-			}
-
 			reader_lock lock(m_cache_mutex);
 
 			//Check if trivial memcpy can perform the same task
@@ -1870,6 +1868,12 @@ namespace rsx
 
 			if (cached_dest)
 			{
+				if (!cached_dest->is_locked())
+				{
+					cached_dest->reprotect(utils::protection::no);
+					m_cache[get_block_address(cached_dest->get_section_base())].notify();
+				}
+
 				//Prep surface
 				auto channel_order = src_is_render_target ? rsx::texture_create_flags::native_component_order :
 					dst_is_argb8 ? rsx::texture_create_flags::default_component_order :
