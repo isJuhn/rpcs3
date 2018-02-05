@@ -603,7 +603,7 @@ VKGSRender::VKGSRender() : GSRender()
 	m_uniform_buffer_ring_info.heap.reset(new vk::buffer(*m_device, VK_UBO_RING_BUFFER_SIZE_M * 0x100000, m_memory_type_mapping.host_visible_coherent, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 0));
 	m_index_buffer_ring_info.init(VK_INDEX_RING_BUFFER_SIZE_M * 0x100000, "index buffer");
 	m_index_buffer_ring_info.heap.reset(new vk::buffer(*m_device, VK_INDEX_RING_BUFFER_SIZE_M * 0x100000, m_memory_type_mapping.host_visible_coherent, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 0));
-	m_texture_upload_buffer_ring_info.init(VK_TEXTURE_UPLOAD_RING_BUFFER_SIZE_M * 0x100000, "texture upload buffer", 0x400000);
+	m_texture_upload_buffer_ring_info.init(VK_TEXTURE_UPLOAD_RING_BUFFER_SIZE_M * 0x100000, "texture upload buffer", 32 * 0x100000);
 	m_texture_upload_buffer_ring_info.heap.reset(new vk::buffer(*m_device, VK_TEXTURE_UPLOAD_RING_BUFFER_SIZE_M * 0x100000, m_memory_type_mapping.host_visible_coherent, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 0));
 
 	for (auto &ctx : frame_context_storage)
@@ -884,29 +884,8 @@ void VKGSRender::notify_tile_unbound(u32 tile)
 	}
 }
 
-void VKGSRender::begin()
+void VKGSRender::check_heap_status()
 {
-	rsx::thread::begin();
-
-	if (skip_frame || renderer_unavailable ||
-		(conditional_render_enabled && conditional_render_test_failed))
-		return;
-
-	init_buffers(rsx::framebuffer_creation_context::context_draw);
-
-	if (!framebuffer_status_valid)
-		return;
-
-	//Ease resource pressure if the number of draw calls becomes too high or we are running low on memory resources
-	if (m_current_frame->used_descriptors >= DESCRIPTOR_MAX_DRAW_CALLS)
-	{
-		//No need to stall if we have more than one frame queue anyway
-		flush_command_queue();
-		
-		CHECK_RESULT(vkResetDescriptorPool(*m_device, m_current_frame->descriptor_pool, 0));
-		m_current_frame->used_descriptors = 0;
-	}
-
 	if (m_attrib_ring_info.is_critical() ||
 		m_texture_upload_buffer_ring_info.is_critical() ||
 		m_uniform_buffer_ring_info.is_critical() ||
@@ -953,6 +932,32 @@ void VKGSRender::begin()
 		std::chrono::time_point<steady_clock> submit_end = steady_clock::now();
 		m_flip_time += std::chrono::duration_cast<std::chrono::microseconds>(submit_end - submit_start).count();
 	}
+}
+
+void VKGSRender::begin()
+{
+	rsx::thread::begin();
+
+	if (skip_frame || renderer_unavailable ||
+		(conditional_render_enabled && conditional_render_test_failed))
+		return;
+
+	init_buffers(rsx::framebuffer_creation_context::context_draw);
+
+	if (!framebuffer_status_valid)
+		return;
+
+	//Ease resource pressure if the number of draw calls becomes too high or we are running low on memory resources
+	if (m_current_frame->used_descriptors >= DESCRIPTOR_MAX_DRAW_CALLS)
+	{
+		//No need to stall if we have more than one frame queue anyway
+		flush_command_queue();
+
+		CHECK_RESULT(vkResetDescriptorPool(*m_device, m_current_frame->descriptor_pool, 0));
+		m_current_frame->used_descriptors = 0;
+	}
+
+	check_heap_status();
 
 	VkDescriptorSetAllocateInfo alloc_info = {};
 	alloc_info.descriptorPool = m_current_frame->descriptor_pool;
@@ -3163,6 +3168,9 @@ bool VKGSRender::scaled_image_from_memory(rsx::blit_src_info& src, rsx::blit_dst
 {
 	if (renderer_unavailable)
 		return false;
+
+	//Verify enough memory exists before attempting to handle data transfer
+	check_heap_status();
 
 	auto result = m_texture_cache.blit(src, dst, interpolate, m_rtts, *m_current_command_buffer);
 	m_current_command_buffer->begin();
