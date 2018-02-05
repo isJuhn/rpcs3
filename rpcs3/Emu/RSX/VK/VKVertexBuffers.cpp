@@ -179,6 +179,7 @@ namespace
 			{
 				//Emulate primitive restart by breaking up the draw calls
 				rsx::method_registers.current_draw_clause.alternate_first_count_commands.resize(0);
+				rsx::method_registers.current_draw_clause.alternate_first_count_commands.reserve(index_count / 3);
 
 				if (index_type == rsx::index_array_type::u16)
 					rsx::split_index_list(reinterpret_cast<u16*>(tmp.data()), index_count, (u16)UINT16_MAX, rsx::method_registers.current_draw_clause.alternate_first_count_commands);

@@ -281,17 +281,21 @@ namespace vk
 	{
 		g_current_renderer = device;
 
-		const std::array<std::string, 8> black_listed = 
+		const std::array<std::string, 1> black_listed =
 		{
 			// Black list all polaris unless its proven they dont have a problem with primitive restart
-			"RX 580",
+/*			"RX 580",
 			"RX 570",
 			"RX 560",
 			"RX 550",
 			"RX 480",
 			"RX 470",
 			"RX 460",
-			"RX Vega",
+			"RX Vega", */
+
+			//Just blacklist all AMD cards. GCN1 tests on The Evil Within show GCN1 is also broken but does not crash
+			//Broken vertices appear whenever index stream has degenerate primitives and restart index is enabled
+			"AMD"
 		};
 
 		const auto gpu_name = g_current_renderer.gpu().name();
