@@ -301,7 +301,7 @@ namespace rsx
 		bool read_only_tex_invalidate = false;
 
 		//Store of all objects in a flush_always state. A lazy readback is attempted every draw call
-		std::unordered_map<u32, section_storage_type*> m_flush_always_cache;
+		std::unordered_map<u32, u32> m_flush_always_cache;
 
 		//Memory usage
 		const s32 m_max_zombie_objects = 64; //Limit on how many texture objects to keep around for reuse after they are invalidated
@@ -836,7 +836,7 @@ namespace rsx
 			update_cache_tag();
 
 			region.set_memory_read_flags(memory_read_flags::flush_always);
-			m_flush_always_cache[memory_address] = &region;
+			m_flush_always_cache[memory_address] = memory_size;
 		}
 
 		void set_memory_read_flags(u32 memory_address, u32 memory_size, memory_read_flags flags)
@@ -852,7 +852,7 @@ namespace rsx
 				return;
 
 			if (flags == memory_read_flags::flush_always)
-				m_flush_always_cache[memory_address] = &region;
+				m_flush_always_cache[memory_address] = memory_size;
 
 			region.set_memory_read_flags(flags);
 		}
@@ -1933,12 +1933,13 @@ namespace rsx
 			{
 				writer_lock lock(m_cache_mutex);
 
-				for (auto &It : m_flush_always_cache)
+				for (const auto &It : m_flush_always_cache)
 				{
-					if (It.second->get_protection() != utils::protection::no)
+					auto& section = find_cached_texture(It.first, It.second);
+					if (section.get_protection() != utils::protection::no)
 					{
 						auto &range = m_cache[get_block_address(It.first)];
-						It.second->reprotect(utils::protection::no);
+						section.reprotect(utils::protection::no);
 						range.notify();
 					}
 				}
