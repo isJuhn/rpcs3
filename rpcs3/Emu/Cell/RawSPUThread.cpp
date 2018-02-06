@@ -6,6 +6,8 @@
 
 #include "Emu/Cell/RawSPUThread.h"
 
+#include <thread>
+
 // Originally, SPU MFC registers are accessed externally in a concurrent manner (don't mix with channels, SPU MFC channels are isolated)
 thread_local spu_mfc_cmd g_tls_mfc[8] = {};
 
@@ -62,7 +64,9 @@ bool RawSPUThread::read_reg(const u32 addr, u32& value)
 
 	case SPU_Out_MBox_offs:
 	{
+		bool is_written = ch_out_mbox.get_count();
 		value = ch_out_mbox.pop(*this);
+		if (is_written) set_events(SPU_EVENT_LE);
 		return true;
 	}
 
@@ -90,10 +94,29 @@ bool RawSPUThread::read_reg(const u32 addr, u32& value)
 		value = npc;
 		return true;
 	}
+	
+	case SPU_RdSigNotify1_offs:
+	{
+		get_ch_value(SPU_RdSigNotify1, value);
+		return true;
+	}
+
+	case SPU_RdSigNotify2_offs:
+	{
+		get_ch_value(SPU_RdSigNotify2, value);
+		return true;
+	}
+
 
 	case SPU_RunCntl_offs:
 	{
 		value = run_ctrl;
+		return true;
+	}
+
+	case MFC_MSSync_offs:
+	{
+		value = 0;
 		return true;
 	}
 	}
@@ -189,7 +212,9 @@ bool RawSPUThread::write_reg(const u32 addr, const u32 value)
 
 	case SPU_In_MBox_offs:
 	{
+		bool is_written = ch_in_mbox.get_count();
 		ch_in_mbox.push(*this, value);
+		if (!is_written) set_events(SPU_EVENT_MB);
 		return true;
 	}
 
@@ -234,6 +259,21 @@ bool RawSPUThread::write_reg(const u32 addr, const u32 value)
 	{
 		push_snr(1, value);
 		return true;
+	}
+
+	case MFC_MSSync_offs:
+	{
+		// Hack: empty the queue immediately
+		while (mfc_proxy.size())
+		{
+			if (test(state, cpu_flag::stop + cpu_flag::dbg_global_stop))
+			{
+				return false;
+			}
+
+			std::this_thread::yield();
+			_mm_lfence();
+		}
 	}
 	}
 
