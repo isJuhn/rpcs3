@@ -302,6 +302,7 @@ namespace rsx
 
 		//Store of all objects in a flush_always state. A lazy readback is attempted every draw call
 		std::unordered_map<u32, u32> m_flush_always_cache;
+		u64 m_flush_always_update_timestamp = 0;
 
 		//Memory usage
 		const s32 m_max_zombie_objects = 64; //Limit on how many texture objects to keep around for reuse after they are invalidated
@@ -1931,17 +1932,22 @@ namespace rsx
 		{
 			if (m_flush_always_cache.size())
 			{
-				writer_lock lock(m_cache_mutex);
-
-				for (const auto &It : m_flush_always_cache)
+				if (m_cache_update_tag.load(std::memory_order_consume) != m_flush_always_update_timestamp)
 				{
-					auto& section = find_cached_texture(It.first, It.second);
-					if (section.get_protection() != utils::protection::no)
+					writer_lock lock(m_cache_mutex);
+
+					for (const auto &It : m_flush_always_cache)
 					{
-						auto &range = m_cache[get_block_address(It.first)];
-						section.reprotect(utils::protection::no);
-						range.notify();
+						auto& section = find_cached_texture(It.first, It.second);
+						if (section.get_protection() != utils::protection::no)
+						{
+							auto &range = m_cache[get_block_address(It.first)];
+							section.reprotect(utils::protection::no);
+							range.notify();
+						}
 					}
+
+					m_flush_always_update_timestamp = m_cache_update_tag.load(std::memory_order_consume);
 				}
 			}
 		}
