@@ -11,7 +11,15 @@
 #if !defined(_MSC_VER) && !defined(__SSSE3__)
 #define _mm_shuffle_epi8
 #endif
-
+void _check_intr(SPUThread& spu)
+{
+	// Interrupt jump if interrupts are and enabled and event stat channel count is set
+	if ((spu.events_state & 0x3) == 0x3)
+	{
+		spu.events_state &= ~SPU_INTR_ENABLED;
+		spu.srr0 = std::exchange(spu.pc, -4) + 4;
+	}
+}
 // Compare 16 packed unsigned bytes (greater than)
 inline __m128i sse_cmpgt_epu8(__m128i A, __m128i B)
 {
@@ -47,16 +55,16 @@ void spu_interpreter::set_interrupt_status(SPUThread& spu, spu_opcode_t op)
 			fmt::throw_exception("Undefined behaviour" HERE);
 		}
 
-		spu.set_interrupt_status(true);
+		spu.events_state |= SPU_INTR_ENABLED;
 	}
 	else if (op.d)
 	{
-		spu.set_interrupt_status(false);
+		spu.events_state &= ~SPU_INTR_ENABLED;
 	}
 
-	if (spu.interrupts_enabled && (spu.ch_event_mask & spu.ch_event_stat & SPU_EVENT_INTR_IMPLEMENTED) > 0)
+	if ((spu.events_state & 0x3) == 0x3)
 	{
-		spu.interrupts_enabled = false;
+		spu.events_state &= ~SPU_INTR_ENABLED;
 		spu.srr0 = std::exchange(spu.pc, -4) + 4;
 	}
 }
@@ -93,7 +101,7 @@ void spu_interpreter::MFSPR(SPUThread& spu, spu_opcode_t op)
 
 void spu_interpreter::RDCH(SPUThread& spu, spu_opcode_t op)
 {
-	u32 result;
+	u32 result = spu.gpr[op.ra]._u32[3];
 
 	if (!spu.get_ch_value(op.ra, result))
 	{
@@ -101,6 +109,7 @@ void spu_interpreter::RDCH(SPUThread& spu, spu_opcode_t op)
 	}
 	else
 	{
+		spu.status &= ~SPU_STATUS_WAITING_FOR_CHANNEL;
 		spu.gpr[op.rt] = v128::from32r(result);
 	}
 }
@@ -323,6 +332,7 @@ void spu_interpreter::WRCH(SPUThread& spu, spu_opcode_t op)
 	{
 		spu.pc -= 4;
 	}
+	spu.status &= ~SPU_STATUS_WAITING_FOR_CHANNEL;
 }
 
 void spu_interpreter::BIZ(SPUThread& spu, spu_opcode_t op)
@@ -393,7 +403,14 @@ void spu_interpreter::IRET(SPUThread& spu, spu_opcode_t op)
 
 void spu_interpreter::BISLED(SPUThread& spu, spu_opcode_t op)
 {
-	fmt::throw_exception("Unimplemented instruction" HERE);
+	const u32 target = spu_branch_target(spu.gpr[op.ra]._u32[3]) ;
+	spu.gpr[op.rt] = v128::from32r(spu_branch_target(spu.pc + 4)) ;
+
+	if (spu.get_events(true))
+	{
+	 	spu.pc = target - 4;
+		set_interrupt_status(spu, op);
+	}
 }
 
 void spu_interpreter::HBR(SPUThread& spu, spu_opcode_t op)
@@ -1176,6 +1193,7 @@ void spu_interpreter::BRNZ(SPUThread& spu, spu_opcode_t op)
 	if (spu.gpr[op.rt]._u32[3] != 0)
 	{
 		spu.pc = spu_branch_target(spu.pc, op.i16) - 4;
+		_check_intr(spu);
 	}
 }
 
@@ -1184,6 +1202,7 @@ void spu_interpreter::BRHZ(SPUThread& spu, spu_opcode_t op)
 	if (spu.gpr[op.rt]._u16[6] == 0)
 	{
 		spu.pc = spu_branch_target(spu.pc, op.i16) - 4;
+		_check_intr(spu);
 	}
 }
 
@@ -1192,6 +1211,7 @@ void spu_interpreter::BRHNZ(SPUThread& spu, spu_opcode_t op)
 	if (spu.gpr[op.rt]._u16[6] != 0)
 	{
 		spu.pc = spu_branch_target(spu.pc, op.i16) - 4;
+		_check_intr(spu);
 	}
 }
 
@@ -1203,6 +1223,7 @@ void spu_interpreter::STQR(SPUThread& spu, spu_opcode_t op)
 void spu_interpreter::BRA(SPUThread& spu, spu_opcode_t op)
 {
 	spu.pc = spu_branch_target(0, op.i16) - 4;
+	_check_intr(spu);
 }
 
 void spu_interpreter::LQA(SPUThread& spu, spu_opcode_t op)
@@ -1215,11 +1236,13 @@ void spu_interpreter::BRASL(SPUThread& spu, spu_opcode_t op)
 	const u32 target = spu_branch_target(0, op.i16);
 	spu.gpr[op.rt] = v128::from32r(spu_branch_target(spu.pc + 4));
 	spu.pc = target - 4;
+	_check_intr(spu);
 }
 
 void spu_interpreter::BR(SPUThread& spu, spu_opcode_t op)
 {
 	spu.pc = spu_branch_target(spu.pc, op.i16) - 4;
+	_check_intr(spu);
 }
 
 void spu_interpreter::FSMBI(SPUThread& spu, spu_opcode_t op)
@@ -1232,6 +1255,7 @@ void spu_interpreter::BRSL(SPUThread& spu, spu_opcode_t op)
 	const u32 target = spu_branch_target(spu.pc, op.i16);
 	spu.gpr[op.rt] = v128::from32r(spu_branch_target(spu.pc + 4));
 	spu.pc = target - 4;
+	_check_intr(spu);
 }
 
 void spu_interpreter::LQR(SPUThread& spu, spu_opcode_t op)

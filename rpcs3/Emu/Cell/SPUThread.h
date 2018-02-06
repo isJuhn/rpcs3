@@ -52,7 +52,7 @@ enum : u32
 {
 	SPU_EVENT_MS = 0x1000, // Multisource Synchronization event
 	SPU_EVENT_A  = 0x800,  // Privileged Attention event
-	SPU_EVENT_LR = 0x400,  // Lock Line Reservation Lost event
+	SPU_EVENT_LR = 0x400,  // Lock Line Reservation Lost event ~ TODO: check if an immediate update needed
 	SPU_EVENT_S1 = 0x200,  // Signal Notification Register 1 available
 	SPU_EVENT_S2 = 0x100,  // Signal Notification Register 2 available
 	SPU_EVENT_LE = 0x80,   // SPU Outbound Mailbox available
@@ -63,14 +63,9 @@ enum : u32
 	SPU_EVENT_SN = 0x2,    // MFC List Command stall-and-notify event
 	SPU_EVENT_TG = 0x1,    // MFC Tag Group status update event
 
-	SPU_EVENT_IMPLEMENTED  = SPU_EVENT_LR | SPU_EVENT_TM | SPU_EVENT_SN, // Mask of implemented events
-	SPU_EVENT_INTR_IMPLEMENTED = SPU_EVENT_SN,
-
-	SPU_EVENT_WAITING      = 0x80000000, // Originally unused, set when SPU thread starts waiting on ch_event_stat
-	//SPU_EVENT_AVAILABLE  = 0x40000000, // Originally unused, channel count of the SPU_RdEventStat channel
-	//SPU_EVENT_INTR_ENABLED = 0x20000000, // Originally unused, represents "SPU Interrupts Enabled" status
-
-	SPU_EVENT_INTR_TEST = SPU_EVENT_INTR_IMPLEMENTED
+	SPU_INTR_ENABLED = 0x1, // Reflects the status of the interrupt facility
+	SPU_EVENT_AVAILABLE = 0x2, // Channel count of the SPU_RdEventStat channel
+	SPU_DEC_RUN = 0x4, // Reflects the state of the decrementer
 };
 
 // SPU Class 0 Interrupts
@@ -97,15 +92,20 @@ enum
 	SPU_RUNCNTL_RUN_REQUEST  = 1,
 };
 
-// SPU Status Register bits (not accurate)
+// SPU Status Register bits
 enum
 {
-	SPU_STATUS_STOPPED             = 0x0,
-	SPU_STATUS_RUNNING             = 0x1,
-	SPU_STATUS_STOPPED_BY_STOP     = 0x2,
-	SPU_STATUS_STOPPED_BY_HALT     = 0x4,
-	SPU_STATUS_WAITING_FOR_CHANNEL = 0x8,
-	SPU_STATUS_SINGLE_STEP         = 0x10,
+	SPU_STATUS_STOPPED,
+	SPU_STATUS_RUNNING             = (1u << 0),
+	SPU_STATUS_STOPPED_BY_STOP     = (1u << 1),
+	SPU_STATUS_STOPPED_BY_HALT     = (1u << 2),
+	SPU_STATUS_WAITING_FOR_CHANNEL = (1u << 3),
+	SPU_STATUS_SINGLE_STEP         = (1u << 4),
+	SPU_STATUS_INVAL_INSTRUC	   = (1u << 5),
+	SPU_STATUS_INVAL_CHANNEL	   = (1u << 6),
+	SPU_STATUS_ISO_STATE		   = (1u << 7),
+	SPU_STATUS_ISO_LOAD			   = (1u << 9),
+	SPU_STATUS_ISO_EXIT			   = (1u << 10),
 };
 
 enum : u32
@@ -451,7 +451,7 @@ public:
 		{
 		case 0:
 			return this->_u32[3] >> 8 & 0x3;
-		
+
 		case 1:
 			return this->_u32[3] >> 10 & 0x3;
 
@@ -563,10 +563,10 @@ public:
 
 	atomic_t<u32> ch_event_mask;
 	atomic_t<u32> ch_event_stat;
-	atomic_t<bool> interrupts_enabled;
+	atomic_t<u8> events_state;
 
-	u64 ch_dec_start_timestamp; // timestamp of writing decrementer value
-	u32 ch_dec_value; // written decrementer value
+	atomic_t<u64> ch_dec_start_timestamp; // timestamp of writing decrementer value
+	atomic_t<u32> ch_dec_value; // written decrementer value and the decrementer value when it stops.
 
 	atomic_t<u32> run_ctrl; // SPU Run Control register (only provided to get latest data written)
 	atomic_t<u32> status; // SPU Status register
@@ -577,7 +577,7 @@ public:
 	std::array<std::pair<u32, std::weak_ptr<lv2_event_queue>>, 32> spuq; // Event Queue Keys for SPU Thread
 	std::weak_ptr<lv2_event_queue> spup[64]; // SPU Ports
 
-	u32 pc = 0; // 
+	u32 pc = 0; //
 	const u32 index; // SPU index
 	const u32 offset; // SPU LS offset
 	lv2_spu_group* const group; // SPU Thread Group
@@ -595,10 +595,10 @@ public:
 	void do_dma_transfer(const spu_mfc_cmd& args, bool from_mfc = true);
 
 	void process_mfc_cmd();
-	u32 get_events(bool waiting = false);
+	u32 get_events(bool waiting);
 	void set_events(u32 mask);
-	void set_interrupt_status(bool enable);
 	u32 get_ch_count(u32 ch);
+	void decrementer_thread();
 	bool get_ch_value(u32 ch, u32& out);
 	bool set_ch_value(u32 ch, u32 value);
 	bool stop_and_signal(u32 code);

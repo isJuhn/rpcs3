@@ -22,6 +22,7 @@
 #include <cfenv>
 #include <atomic>
 #include <thread>
+#include <chrono>
 
 const bool s_use_rtm = utils::has_rtm();
 
@@ -346,7 +347,7 @@ void SPUThread::cpu_init()
 
 	ch_event_mask = 0;
 	ch_event_stat = 0;
-	interrupts_enabled = false;
+	events_state = 0;
 	raddr = 0;
 
 	ch_dec_start_timestamp = get_timebased_time(); // ???
@@ -396,7 +397,7 @@ void SPUThread::cpu_task()
 		if (!test(state))
 		{
 			// Read opcode
-			const u32 op = base[pc / 4];
+			const u32 op = base[pc >> 2];
 
 			// Call interpreter function
 			table[spu_decode(op)](*this, { op });
@@ -652,12 +653,12 @@ void SPUThread::process_mfc_cmd()
 
 		if (raddr && raddr != ch_mfc_cmd.eal)
 		{
-			ch_event_stat |= SPU_EVENT_LR;
+			set_events(SPU_EVENT_LR);
 		}
 
-		const bool is_polling = false;// raddr == _addr && rtime == _time; // TODO
+		const bool is_polling = false;//raddr == _addr && rtime == _time; // TODO
 
-		_mm_lfence();
+		_mm_mfence();
 		raddr = _addr;
 		rtime = _time;
 
@@ -771,7 +772,7 @@ void SPUThread::process_mfc_cmd()
 
 		if (raddr && !result)
 		{
-			ch_event_stat |= SPU_EVENT_LR;
+			set_events(SPU_EVENT_LR);
 		}
 
 		raddr = 0;
@@ -781,8 +782,8 @@ void SPUThread::process_mfc_cmd()
 	{
 		if (raddr && ch_mfc_cmd.eal == raddr)
 		{
-			ch_event_stat |= SPU_EVENT_LR;
 			raddr = 0;
+			set_events(SPU_EVENT_LR);
 		}
 
 		auto& data = vm::ps3::_ref<decltype(rdata)>(ch_mfc_cmd.eal);
@@ -977,64 +978,44 @@ u32 SPUThread::get_events(bool waiting)
 	// Check reservation status and set SPU_EVENT_LR if lost
 	if (raddr && (vm::reservation_acquire(raddr, sizeof(rdata)) != rtime || rdata != vm::ps3::_ref<decltype(rdata)>(raddr)))
 	{
-		ch_event_stat |= SPU_EVENT_LR;
 		raddr = 0;
+		set_events(SPU_EVENT_LR);
 	}
 
-	// SPU Decrementer Event
-	if (!ch_dec_value || (ch_dec_value - (get_timebased_time() - ch_dec_start_timestamp)) >> 31)
-	{
-		if ((ch_event_stat & SPU_EVENT_TM) == 0)
-		{
-			ch_event_stat |= SPU_EVENT_TM;
-		}
-	}
-
-	// Simple polling or polling with atomically set/removed SPU_EVENT_WAITING flag
-	return !waiting ? ch_event_stat & ch_event_mask : ch_event_stat.atomic_op([&](u32& stat) -> u32
-	{
-		if (u32 res = stat & ch_event_mask)
-		{
-			stat &= ~SPU_EVENT_WAITING;
-			return res;
-		}
-
-		stat |= SPU_EVENT_WAITING;
-		return 0;
-	});
+	// Simple polling or returning SPU_EVENT_AVAILABLE flag status
+	return waiting ? events_state & SPU_EVENT_AVAILABLE : ch_event_stat & ch_event_mask;
 }
 
 void SPUThread::set_events(u32 mask)
 {
-	if (u32 unimpl = mask & ~SPU_EVENT_IMPLEMENTED)
+	if (mask & ~ch_event_stat)
 	{
-		fmt::throw_exception("Unimplemented events (0x%x)" HERE, unimpl);
-	}
-
-	// Set new events, get old event mask
-	const u32 old_stat = ch_event_stat.fetch_or(mask);
-
-	// Notify if some events were set
-	if (~old_stat & mask && old_stat & SPU_EVENT_WAITING && ch_event_stat & SPU_EVENT_WAITING)
-	{
-		notify();
+		ch_event_stat |= mask;
+		if (ch_event_mask & mask)
+		{
+			events_state |= SPU_EVENT_AVAILABLE;
+			notify();
+		}
 	}
 }
 
-void SPUThread::set_interrupt_status(bool enable)
+void SPUThread::decrementer_thread()
 {
-	if (enable)
+	// SPU Decrementer Event
+	thread_local u64 current = (u64)ch_dec_value;
+	while (true)
 	{
-		// detect enabling interrupts with events masked
-		if (u32 mask = ch_event_mask & ~SPU_EVENT_INTR_IMPLEMENTED)
+		if (current > 20000000 /*second / 4*/) std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		_mm_mfence();
+
+		if (test(state & cpu_flag::stop ) || (events_state & SPU_DEC_RUN) == 0) {break;}
+
+		if ((current = (u64)ch_dec_value - (get_timebased_time() - ch_dec_start_timestamp)) >> 32)
 		{
-			fmt::throw_exception("SPU Interrupts not implemented (mask=0x%x)" HERE, mask);
+			ch_dec_start_timestamp = get_timebased_time();
+			ch_dec_value = (u32)current;
+			set_events(SPU_EVENT_TM);
 		}
-		interrupts_enabled = true;
-	}
-	else
-	{
-		interrupts_enabled = false;
 	}
 }
 
@@ -1053,7 +1034,7 @@ u32 SPUThread::get_ch_count(u32 ch)
 	case SPU_RdSigNotify1:    return ch_snr1.get_count();
 	case SPU_RdSigNotify2:    return ch_snr2.get_count();
 	case MFC_RdAtomicStat:    return ch_atomic_stat.get_count();
-	case SPU_RdEventStat:     return get_events() != 0;
+	case SPU_RdEventStat:     return get_events(true) != 0;
 	case MFC_Cmd:             return std::max(16 - mfc_queue.size(), (u32)0);
 	}
 
@@ -1066,6 +1047,7 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 
 	auto read_channel = [&](spu_channel_t& channel)
 	{
+		status |= SPU_STATUS_WAITING_FOR_CHANNEL;
 		if (channel.try_pop(out))
 			return true;
 
@@ -1106,6 +1088,7 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 	}
 	case SPU_RdInMbox:
 	{
+		if (ch_in_mbox.get_count() == 0) status |= SPU_STATUS_WAITING_FOR_CHANNEL;
 		while (true)
 		{
 			for (int i = 0; i < 10 && ch_in_mbox.get_count() == 0; i++)
@@ -1165,10 +1148,10 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 
 	case SPU_RdDec:
 	{
-		out = ch_dec_value - (u32)(get_timebased_time() - ch_dec_start_timestamp);
+		out = events_state & SPU_DEC_RUN ? (ch_dec_value - (u32)(get_timebased_time() - ch_dec_start_timestamp)) : ch_dec_value;
 
 		//Polling: We might as well hint to the scheduler to slot in another thread since this one is counting down
-		if (g_cfg.core.spu_loop_detection && out > spu::scheduler::native_jiffy_duration_us)
+		if (g_cfg.core.spu_loop_detection && out > spu::scheduler::native_jiffy_duration_us && events_state & SPU_DEC_RUN)
 			std::this_thread::yield();
 
 		return true;
@@ -1182,18 +1165,25 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 
 	case SPU_RdEventStat:
 	{
-		u32 res = get_events();
-
-		if (res)
+		u32 res = get_events(false);
+		if (events_state & SPU_EVENT_AVAILABLE)
 		{
-			out = res;
+			if (events_state & SPU_INTR_ENABLED)
+			{
+				events_state &= ~SPU_INTR_ENABLED;
+				std::exchange(pc, -4);
+			}
+			else 
+			{
+				out = res;
+				events_state &= ~SPU_EVENT_AVAILABLE;
+			}
 			return true;
 		}
-
-		vm::waiter waiter;
-
-		if (ch_event_mask & SPU_EVENT_LR)
+		status |= SPU_STATUS_WAITING_FOR_CHANNEL;
+		if ((ch_event_mask & SPU_EVENT_LR) &  ~(ch_event_stat & SPU_EVENT_LR))
 		{
+			vm::waiter waiter;
 			waiter.owner = this;
 			waiter.addr = raddr;
 			waiter.size = 128;
@@ -1202,7 +1192,8 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 			waiter.init();
 		}
 
-		while (!(res = get_events(true)))
+		// Waits on SPU_EVENT_AVAILABLE to set
+		while (get_events(true) == 0)
 		{
 			if (test(state & cpu_flag::stop))
 			{
@@ -1212,7 +1203,13 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 			thread_ctrl::wait_for(100);
 		}
 
-		out = res;
+		if (events_state & SPU_INTR_ENABLED)
+		{
+			events_state &= ~SPU_INTR_ENABLED;
+			std::exchange(pc, -4);
+		}
+		else {out = ch_event_stat & ch_event_mask;
+		events_state &= ~SPU_EVENT_AVAILABLE;}
 		return true;
 	}
 
@@ -1220,12 +1217,12 @@ bool SPUThread::get_ch_value(u32 ch, u32& out)
 	{
 		// HACK: "Not isolated" status
 		// Return SPU Interrupt status in LSB
-		out = interrupts_enabled == true;
+		out = events_state & 1;
 		return true;
 	}
 	}
 
-	fmt::throw_exception("Unknown/illegal channel (ch=%d [%s])" HERE, ch, ch < 128 ? spu_ch_name[ch] : "???");
+	fmt::throw_exception("Unreadable Channel (ch=%d [%s])" HERE, ch, ch < 128 ? spu_ch_name[ch] : "???");
 }
 
 bool SPUThread::set_ch_value(u32 ch, u32 value)
@@ -1244,14 +1241,17 @@ bool SPUThread::set_ch_value(u32 ch, u32 value)
 	{
 		if (offset >= RAW_SPU_BASE_ADDR)
 		{
-			while (!ch_out_intr_mbox.try_push(value))
+			if (!ch_out_intr_mbox.try_push(value))
 			{
-				if (test(state & cpu_flag::stop))
-				{
-					return false;
-				}
+				status |= SPU_STATUS_WAITING_FOR_CHANNEL;
+				do{
+					if (test(state & cpu_flag::stop))
+					{
+						return false;
+					}
 
-				thread_ctrl::wait();
+					thread_ctrl::wait();
+				} while (!ch_out_intr_mbox.try_push(value));
 			}
 
 			int_ctrl[2].set(SPU_INT2_STAT_MAILBOX_INT);
@@ -1390,6 +1390,7 @@ bool SPUThread::set_ch_value(u32 ch, u32 value)
 
 	case SPU_WrOutMbox:
 	{
+		status |= SPU_STATUS_WAITING_FOR_CHANNEL;
 		while (!ch_out_mbox.try_push(value))
 		{
 			if (test(state & cpu_flag::stop))
@@ -1529,37 +1530,47 @@ bool SPUThread::set_ch_value(u32 ch, u32 value)
 
 	case SPU_WrDec:
 	{
+		const bool is_running = events_state & SPU_DEC_RUN;
+
+		// Check if the event should already signalled
+		const bool is_already_occur = ((value & ~(is_running ? (ch_dec_value - (u32)(get_timebased_time() - ch_dec_start_timestamp)) : ch_dec_value)) >> 31);
+
 		ch_dec_start_timestamp = get_timebased_time();
 		ch_dec_value = value;
+		events_state |= SPU_DEC_RUN;
+
+		if (is_already_occur) {set_events(SPU_EVENT_TM);}
+
+		// If the decrementer wasnt running before, make a thread that checks for his event
+		if (!is_running) std::thread (&SPUThread::decrementer_thread ,this).detach();
 		return true;
 	}
 
 	case SPU_WrEventMask:
 	{
-		// detect masking events with enabled interrupt status
-		if (value & ~SPU_EVENT_INTR_IMPLEMENTED && interrupts_enabled)
-		{
-			fmt::throw_exception("SPU Interrupts not implemented (mask=0x%x)" HERE, value);
-		}
-
-		// detect masking unimplemented events
-		if (value & ~SPU_EVENT_IMPLEMENTED)
-		{
-			break;
-		}
-
 		ch_event_mask = value;
+
+		// Check if enabled and pending events still pending
+		if (ch_event_stat & ch_event_mask) events_state |= SPU_EVENT_AVAILABLE;
+
 		return true;
 	}
 
 	case SPU_WrEventAck:
 	{
-		if (value & ~SPU_EVENT_IMPLEMENTED)
-		{
-			break;
-		}
-
 		ch_event_stat &= ~value;
+
+		// Check if enabled and pending events still pending
+		if (ch_event_stat & ch_event_mask) events_state |= SPU_EVENT_AVAILABLE;
+
+		if (events_state & SPU_DEC_RUN)
+		{
+			if (value & SPU_EVENT_TM && (ch_event_mask & SPU_EVENT_TM) == 0)
+			{
+				ch_dec_value -= (u32)(get_timebased_time() - ch_dec_start_timestamp);
+				events_state.raw() &= ~SPU_DEC_RUN; // Stop the decrementer.
+			}
+		}
 		return true;
 	}
 
@@ -1586,7 +1597,7 @@ bool SPUThread::set_ch_value(u32 ch, u32 value)
 	}
 	}
 
-	fmt::throw_exception("Unknown/illegal channel (ch=%d [%s], value=0x%x)" HERE, ch, ch < 128 ? spu_ch_name[ch] : "???", value);
+	fmt::throw_exception("Unwritable Channel (ch=%d [%s])" HERE, ch, ch < 128 ? spu_ch_name[ch] : "???");
 }
 
 bool SPUThread::stop_and_signal(u32 code)

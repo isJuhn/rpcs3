@@ -301,18 +301,16 @@ inline asmjit::X86Mem spu_recompiler::XmmConst(__m128i data)
 void spu_recompiler::CheckInterruptStatus(spu_opcode_t op)
 {
 	if (op.d)
-		c->lock().btr(SPU_OFF_8(interrupts_enabled), 0);
+		c->lock().btr(SPU_OFF_8(events_state), 0);
 	else if (op.e)
-	{
-		c->lock().bts(SPU_OFF_8(interrupts_enabled), 0);
-		c->mov(*qw0, SPU_OFF_32(ch_event_stat));
-		c->and_(*qw0, SPU_OFF_32(ch_event_mask));
-		c->and_(*qw0, SPU_EVENT_INTR_TEST);
-		c->cmp(*qw0, 0);
+		c->lock().bts(SPU_OFF_8(events_state), 0);
+		c->mov(*qw0, SPU_OFF_8(events_state));
+		c->and_(*qw0, 0x3);
+		c->cmp(*qw0, 0x3);
 
 		asmjit::Label noInterrupt = c->newLabel();
-		c->je(noInterrupt);
-		c->lock().btr(SPU_OFF_8(interrupts_enabled), 0);
+		c->jne(noInterrupt);
+		c->lock().btr(SPU_OFF_8(events_state), 0);
 		c->mov(SPU_OFF_32(srr0), *addr);
 		c->mov(SPU_OFF_32(pc), 0);
 
@@ -321,7 +319,6 @@ void spu_recompiler::CheckInterruptStatus(spu_opcode_t op)
 		c->mov(*addr, SPU_OFF_32(srr0));
 		c->bind(noInterrupt);
 		c->unuse(*qw0);
-	}
 }
 
 void spu_recompiler::InterpreterCall(spu_opcode_t op)
@@ -387,12 +384,12 @@ void spu_recompiler::FunctionCall()
 					fmt::throw_exception("Undefined behaviour" HERE);
 				}
 
-				_spu->interrupts_enabled = true;
+				_spu->events_state |= 1;
 				_spu->pc &= ~0x4000000;
 			}
 			else if (_spu->pc & 0x8000000)
 			{
-				_spu->interrupts_enabled = false;
+				_spu->events_state &= ~1;
 				_spu->pc &= ~0x8000000;
 			}
 
@@ -1254,7 +1251,7 @@ void spu_recompiler::IRET(spu_opcode_t op)
 
 void spu_recompiler::BISLED(spu_opcode_t op)
 {
-	fmt::throw_exception("Unimplemented instruction" HERE);
+	InterpreterCall(op); // TODO
 }
 
 void spu_recompiler::HBR(spu_opcode_t op)

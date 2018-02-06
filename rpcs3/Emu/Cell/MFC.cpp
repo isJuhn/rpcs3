@@ -200,7 +200,7 @@ void mfc_thread::cpu_task()
 						{
 							cmd.lsa &= 0x3fff0;
 
-							// try to get the whole list done in one go
+							// Try to get the whole list done in one go
 							while (cmd.size != 0)
 							{
 								const list_element item = spu._ref<list_element>(cmd.eal & 0x3fff8);
@@ -226,27 +226,22 @@ void mfc_thread::cpu_task()
 								cmd.size -= 8;
 								no_updates = 0;
 
-								// dont stall for last 'item' in list
+								// Dont stall for last 'item' in list
 								if ((item.sb & 0x8000) && (cmd.size != 0))
 								{
 									spu.ch_stall_mask |= (1 << cmd.tag);
+									bool is_written = spu.ch_stall_stat.get_count();
 									spu.ch_stall_stat.push_or(spu, 1 << cmd.tag);
-
-									const u32 evt = spu.ch_event_stat.fetch_or(SPU_EVENT_SN);
-
-									if (evt & SPU_EVENT_WAITING)
-									{
-										spu.notify();
-									}
+									if (!is_written) spu.set_events(SPU_EVENT_SN);
 									break;
 								}
 							}
 						}
 
-						if (cmd.size != 0 && (cmd.cmd & MFC_BARRIER_MASK))
-							barrier_mask |= (1 << cmd.tag);
-						else if (cmd.size != 0)
-							fence_mask |= (1 << cmd.tag);
+						if (cmd.size)
+						{
+							cmd.cmd & MFC_BARRIER_MASK ? barrier_mask |= (1 << cmd.tag) : fence_mask |= (1 << cmd.tag);
+						}
 					}
 					else if (UNLIKELY((cmd.cmd & ~0xc) == MFC_BARRIER_CMD))
 					{
