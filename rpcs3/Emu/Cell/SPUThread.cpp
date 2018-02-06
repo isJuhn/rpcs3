@@ -455,7 +455,7 @@ void SPUThread::push_snr(u32 number, u32 value)
 
 void SPUThread::do_dma_transfer(const spu_mfc_cmd& args, bool from_mfc)
 {
-	const bool is_get = (args.cmd & ~(MFC_BARRIER_MASK | MFC_FENCE_MASK)) == MFC_GET_CMD;
+	const bool is_get = (args.cmd & ~(MFC_BARRIER_MASK | MFC_FENCE_MASK | MFC_LIST_MASK)) == MFC_GET_CMD;
 
 	u32 eal = args.eal;
 	u32 lsa = args.lsa & 0x3ffff;
@@ -923,7 +923,7 @@ void SPUThread::process_mfc_cmd()
 					transfer.eah = 0;
 					transfer.lsa = ch_mfc_cmd.lsa | (addr & 0xf);
 					transfer.tag = ch_mfc_cmd.tag;
-					transfer.cmd = MFC(ch_mfc_cmd.cmd & ~MFC_LIST_MASK);
+					transfer.cmd = ch_mfc_cmd.cmd;
 					transfer.size = size;
 
 					do_dma_transfer(transfer);

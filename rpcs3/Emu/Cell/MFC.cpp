@@ -215,7 +215,7 @@ void mfc_thread::cpu_task()
 									transfer.eah = 0;
 									transfer.lsa = cmd.lsa | (addr & 0xf);
 									transfer.tag = cmd.tag;
-									transfer.cmd = MFC(cmd.cmd & ~MFC_LIST_MASK);
+									transfer.cmd = cmd.cmd;
 									transfer.size = size;
 
 									spu.do_dma_transfer(transfer);
