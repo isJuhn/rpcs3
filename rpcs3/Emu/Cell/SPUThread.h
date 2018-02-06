@@ -521,6 +521,8 @@ public:
 	static const u32 id_step = 1;
 	static const u32 id_count = 2048;
 
+	static const u32 const_counts = 0x440FB86;
+
 	SPUThread(const std::string& name, u32 index, lv2_spu_group* group);
 
 	// General-Purpose Registers

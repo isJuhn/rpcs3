@@ -1022,7 +1022,8 @@ void SPUThread::decrementer_thread()
 
 u32 SPUThread::get_ch_count(u32 ch)
 {
-	LOG_TRACE(SPU, "get_ch_count(ch=%d [%s])", ch, ch < 128 ? spu_ch_name[ch] : "???");
+	if (ch > 127) fmt::throw_exception("illegal channel (ch=%d)" HERE, ch);
+	LOG_TRACE(SPU, "get_ch_count(ch=%d [%s])", ch, spu_ch_name[ch]);
 
 	switch (ch)
 	{
@@ -1037,9 +1038,8 @@ u32 SPUThread::get_ch_count(u32 ch)
 	case MFC_RdAtomicStat:    return ch_atomic_stat.get_count();
 	case SPU_RdEventStat:     return get_events(true) != 0;
 	case MFC_Cmd:             return std::max(16 - mfc_queue.size(), (u32)0);
+	default : 				  return (const_counts & (0x1 << ch)) != 0;
 	}
-
-	fmt::throw_exception("Unknown/illegal channel (ch=%d [%s])" HERE, ch, ch < 128 ? spu_ch_name[ch] : "???");
 }
 
 bool SPUThread::get_ch_value(u32 ch, u32& out)
