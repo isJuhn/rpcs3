@@ -425,7 +425,7 @@ namespace rsx
 					if (tex.cache_tag == cache_tag) continue; //already processed
 					if (!tex.is_locked()) continue;	//flushable sections can be 'clean' but unlocked. TODO: Handle this better
 
-					auto overlapped = tex.overlaps_page(trampled_range, address, strict_range_check);
+					auto overlapped = tex.overlaps_page(trampled_range, address, strict_range_check || tex.get_context() == rsx::texture_upload_context::blit_engine_dst);
 					if (std::get<0>(overlapped))
 					{
 						auto &new_range = std::get<1>(overlapped);
