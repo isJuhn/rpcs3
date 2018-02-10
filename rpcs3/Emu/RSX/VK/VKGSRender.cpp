@@ -2034,11 +2034,6 @@ void VKGSRender::process_swap_request(frame_context_t *ctx, bool free_resources)
 
 void VKGSRender::do_local_task(bool /*idle*/)
 {
-	if (!in_begin_end)
-	{
-		m_texture_cache.do_update();
-	}
-
 	if (m_flush_requests.pending())
 	{
 		std::lock_guard<std::mutex> lock(m_flush_queue_mutex);
@@ -2049,6 +2044,12 @@ void VKGSRender::do_local_task(bool /*idle*/)
 
 		m_flush_requests.clear_pending_flag();
 		m_flush_requests.consumer_wait();
+	}
+	else if (!in_begin_end)
+	{
+		//This will re-engage locks and break the texture cache if another thread is waiting in access violation handler!
+		//Only call when there are no waiters
+		m_texture_cache.do_update();
 	}
 
 	if (m_last_flushable_cb > -1)
