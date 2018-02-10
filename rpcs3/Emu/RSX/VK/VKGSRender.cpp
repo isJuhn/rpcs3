@@ -3187,33 +3187,45 @@ bool VKGSRender::scaled_image_from_memory(rsx::blit_src_info& src, rsx::blit_dst
 	auto result = m_texture_cache.blit(src, dst, interpolate, m_rtts, *m_current_command_buffer);
 	m_current_command_buffer->begin();
 
-	if (auto deferred_op_dst = std::get<1>(result))
+	if (std::get<0>(result))
 	{
-		//Requires manual scaling; depth/stencil surface
-		auto deferred_op_src = std::get<2>(result);
-		auto src_view = std::get<3>(result);
+		bool require_flush = false;
+		if (auto deferred_op_dst = std::get<1>(result))
+		{
+			//Requires manual scaling; depth/stencil surface
+			auto deferred_op_src = std::get<2>(result);
+			auto src_view = std::get<3>(result);
 
-		auto rp = vk::get_render_pass_location(VK_FORMAT_UNDEFINED, deferred_op_dst->info.format, 0);
-		auto render_pass = m_render_passes[rp];
+			auto rp = vk::get_render_pass_location(VK_FORMAT_UNDEFINED, deferred_op_dst->info.format, 0);
+			auto render_pass = m_render_passes[rp];
 
-		auto old_src_layout = deferred_op_src->current_layout;
-		auto old_dst_layout = deferred_op_dst->current_layout;
+			auto old_src_layout = deferred_op_src->current_layout;
+			auto old_dst_layout = deferred_op_dst->current_layout;
 
-		vk::change_image_layout(*m_current_command_buffer, deferred_op_src, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+			vk::change_image_layout(*m_current_command_buffer, deferred_op_src, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-		m_depth_scaler->run(*m_current_command_buffer, deferred_op_dst->width(), deferred_op_dst->height(), deferred_op_dst,
-			src_view, render_pass, m_framebuffers_to_clean);
+			m_depth_scaler->run(*m_current_command_buffer, deferred_op_dst->width(), deferred_op_dst->height(), deferred_op_dst,
+				src_view, render_pass, m_framebuffers_to_clean);
 
-		vk::change_image_layout(*m_current_command_buffer, deferred_op_src, old_src_layout);
-		vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, old_dst_layout);
+			vk::change_image_layout(*m_current_command_buffer, deferred_op_src, old_src_layout);
+			vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, old_dst_layout);
+
+			require_flush = true;
+		}
+
+		if (m_texture_cache.flush_if_cache_miss_likely(std::get<4>(result), dst.rsx_address, dst.pitch * dst.clip_height,
+			*m_current_command_buffer, m_memory_type_mapping, m_swap_chain->get_present_queue()))
+			require_flush = true;
+
+		if (require_flush)
+			flush_command_queue();
+
+		m_samplers_dirty.store(true);
+		return true;
 	}
 
-	m_texture_cache.flush_if_cache_miss_likely(std::get<4>(result), dst.rsx_address, dst.pitch * dst.clip_height,
-		*m_current_command_buffer, m_memory_type_mapping, m_swap_chain->get_present_queue());
-
-	m_samplers_dirty.store(true);
-	return std::get<0>(result);
+	return false;
 }
 
 void VKGSRender::clear_zcull_stats(u32 type)

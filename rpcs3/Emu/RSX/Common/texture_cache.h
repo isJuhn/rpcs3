@@ -1081,13 +1081,13 @@ namespace rsx
 		}
 
 		template <typename ...Args>
-		void flush_if_cache_miss_likely(texture_format fmt, u32 memory_address, u32 memory_size, Args&&... extras)
+		bool flush_if_cache_miss_likely(texture_format fmt, u32 memory_address, u32 memory_size, Args&&... extras)
 		{
 			auto It = m_cache_miss_statistics_table.find(memory_address);
 			if (It == m_cache_miss_statistics_table.end())
 			{
 				m_cache_miss_statistics_table[memory_address] = { 0, memory_size, fmt };
-				return;
+				return false;
 			}
 
 			auto &value = It->second;
@@ -1097,11 +1097,11 @@ namespace rsx
 				//Reset since the data has changed
 				//TODO: Keep track of all this information together
 				m_cache_miss_statistics_table[memory_address] = { 0, memory_size, fmt };
-				return;
+				return false;
 			}
 
 			//Properly synchronized - no miss
-			if (!value.misses) return;
+			if (!value.misses) return false;
 
 			//Auto flush if this address keeps missing (not properly synchronized)
 			if (value.misses > 16)
@@ -1109,7 +1109,11 @@ namespace rsx
 				//TODO: Determine better way of setting threshold
 				if (!flush_memory_to_cache(memory_address, memory_size, true, std::forward<Args>(extras)...))
 					value.misses--;
+
+				return true;
 			}
+
+			return false;
 		}
 
 		void purge_dirty()
