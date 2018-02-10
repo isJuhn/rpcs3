@@ -72,7 +72,7 @@ namespace vk
 		for (u32 i = 0; i < memory_properties.memoryTypeCount; i++)
 		{
 			VkMemoryHeap &heap = memory_properties.memoryHeaps[memory_properties.memoryTypes[i].heapIndex];
-			
+
 			bool is_device_local = !!(memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			if (is_device_local)
 			{
@@ -86,7 +86,7 @@ namespace vk
 			bool is_host_visible = !!(memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 			bool is_host_coherent = !!(memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			bool is_cached = !!(memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
-			
+
 			if (is_host_coherent && is_host_visible)
 			{
 				if ((is_cached && !host_visible_cached) ||
