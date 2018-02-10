@@ -3209,6 +3209,9 @@ bool VKGSRender::scaled_image_from_memory(rsx::blit_src_info& src, rsx::blit_dst
 		vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, old_dst_layout);
 	}
 
+	m_texture_cache.flush_if_cache_miss_likely(std::get<4>(result), dst.rsx_address, dst.pitch * dst.clip_height,
+		*m_current_command_buffer, m_memory_type_mapping, m_swap_chain->get_present_queue());
+
 	m_samplers_dirty.store(true);
 	return std::get<0>(result);
 }

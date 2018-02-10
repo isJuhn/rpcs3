@@ -1089,7 +1089,7 @@ namespace rsx
 
 			auto &value = It->second;
 
-			if (value.format != fmt || value.block_size != memory_size)
+			if (value.format != fmt || value.block_size < memory_size)
 			{
 				//Reset since the data has changed
 				//TODO: Keep track of all this information together

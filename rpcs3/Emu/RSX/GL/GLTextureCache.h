@@ -972,7 +972,11 @@ namespace gl
 		bool blit(rsx::blit_src_info& src, rsx::blit_dst_info& dst, bool linear_interpolate, gl_render_targets& m_rtts)
 		{
 			void* unused = nullptr;
-			return upload_scaled_image(src, dst, linear_interpolate, unused, m_rtts, m_hw_blitter);
+			bool result = upload_scaled_image(src, dst, linear_interpolate, unused, m_rtts, m_hw_blitter);
+
+			flush_if_cache_miss_likely(dst.format == rsx::blit_engine::transfer_destination_format::a8r8g8b8?
+				gl::texture::format::bgra : gl::texture::format::rgba, dst.rsx_address, dst.pitch * dst.height);
+			return result;
 		}
 	};
 }

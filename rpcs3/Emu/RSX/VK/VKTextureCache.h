@@ -980,7 +980,7 @@ namespace vk
 			return upload_texture(cmd, tex, m_rtts, cmd, m_memory_types, const_cast<const VkQueue>(m_submit_queue));
 		}
 
-		std::tuple<bool, vk::image*, vk::image*, vk::image_view*> blit(rsx::blit_src_info& src, rsx::blit_dst_info& dst, bool interpolate, rsx::vk_render_targets& m_rtts, vk::command_buffer& cmd)
+		std::tuple<bool, vk::image*, vk::image*, vk::image_view*, VkFormat> blit(rsx::blit_src_info& src, rsx::blit_dst_info& dst, bool interpolate, rsx::vk_render_targets& m_rtts, vk::command_buffer& cmd)
 		{
 			struct blit_helper
 			{
@@ -989,6 +989,7 @@ namespace vk
 
 				vk::image* deferred_op_src = nullptr;
 				vk::image* deferred_op_dst = nullptr;
+				VkFormat dst_format = VK_FORMAT_UNDEFINED;
 
 				void scale_image(vk::image* src, vk::image* dst, areai src_area, areai dst_area, bool /*interpolate*/, bool is_depth)
 				{
@@ -1019,6 +1020,7 @@ namespace vk
 					const auto dst_width = dst_area.x2 - dst_area.x1;
 					const auto dst_height = dst_area.y2 - dst_area.y1;
 
+					dst_format = dst->info.format;
 					if (aspect & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
 					{
 						if (src_width != dst_width || src_height != dst_height || src->info.format != dst->info.format)
@@ -1043,7 +1045,7 @@ namespace vk
 			bool reply = upload_scaled_image(src, dst, interpolate, cmd, m_rtts, helper, cmd, m_memory_types, const_cast<const VkQueue>(m_submit_queue));
 
 			if (helper.deferred_op_src == nullptr)
-				return std::make_tuple(reply, nullptr, nullptr, nullptr);
+				return std::make_tuple(reply, nullptr, nullptr, nullptr, helper.dst_format);
 
 			VkImageSubresourceRange view_range = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
 			auto tmp_view = std::make_unique<vk::image_view>(*vk::get_current_renderer(), helper.deferred_op_src->value, VK_IMAGE_VIEW_TYPE_2D,
@@ -1051,7 +1053,7 @@ namespace vk
 
 			auto src_view = tmp_view.get();
 			m_discardable_storage.push_back(tmp_view);
-			return std::make_tuple(reply, helper.deferred_op_dst, helper.deferred_op_src, src_view);
+			return std::make_tuple(reply, helper.deferred_op_dst, helper.deferred_op_src, src_view, helper.dst_format);
 		}
 
 		const u32 get_unreleased_textures_count() const override
