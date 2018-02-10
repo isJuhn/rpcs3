@@ -40,6 +40,12 @@ namespace rsx
 		u16 rsx_pitch;
 
 		u32 gcm_format = 0;
+		bool pack_unpack_swap_bytes = false;
+
+		bool synchronized = false;
+		bool flushed = false;
+		u32  num_writes = 0;
+		u32  required_writes = 1;
 
 		u64 cache_tag = 0;
 
@@ -77,6 +83,17 @@ namespace rsx
 			}
 
 			return false;
+		}
+
+		void touch()
+		{
+			num_writes++;
+		}
+
+		void reset_write_statistics()
+		{
+			required_writes = num_writes;
+			num_writes = 0;
 		}
 
 		void set_view_flags(rsx::texture_create_flags flags)
@@ -147,6 +164,14 @@ namespace rsx
 		rsx::texture_sampler_status get_sampler_status() const
 		{
 			return sampler_status;
+		}
+
+		bool writes_likely_completed() const
+		{
+			if (context == rsx::texture_upload_context::blit_engine_dst)
+				return num_writes >= required_writes;
+
+			return true;
 		}
 	};
 
@@ -243,6 +268,17 @@ namespace rsx
 
 			deferred_subresource(image_resource_type _res, u32 _addr, u32 _fmt, u16 _x, u16 _y, u16 _w, u16 _h) :
 				external_handle(_res), base_address(_addr), gcm_format(_fmt), x(_x), y(_y), width(_w), height(_h)
+			{}
+		};
+
+		struct blit_op_result
+		{
+			bool succeeded = false;
+			bool is_depth = false;
+			u32 real_dst_address = 0;
+			u32 real_dst_size = 0;
+
+			blit_op_result(bool success) : succeeded(success)
 			{}
 		};
 
@@ -882,6 +918,9 @@ namespace rsx
 
 			if (skip_synchronized && region->is_synchronized())
 				return false;
+
+			if (!region->writes_likely_completed())
+				return true;
 
 			region->copy_texture(false, std::forward<Args>(extra)...);
 			return true;
@@ -1582,7 +1621,7 @@ namespace rsx
 		}
 
 		template <typename surface_store_type, typename blitter_type, typename ...Args>
-		bool upload_scaled_image(rsx::blit_src_info& src, rsx::blit_dst_info& dst, bool interpolate, commandbuffer_type& cmd, surface_store_type& m_rtts, blitter_type& blitter, Args&&... extras)
+		blit_op_result upload_scaled_image(rsx::blit_src_info& src, rsx::blit_dst_info& dst, bool interpolate, commandbuffer_type& cmd, surface_store_type& m_rtts, blitter_type& blitter, Args&&... extras)
 		{
 			//Since we will have dst in vram, we can 'safely' ignore the swizzle flag
 			//TODO: Verify correct behavior
@@ -1934,6 +1973,8 @@ namespace rsx
 					cached_dest->reprotect(utils::protection::no);
 					m_cache[get_block_address(cached_dest->get_section_base())].notify();
 				}
+
+				cached_dest->touch();
 			}
 
 			const f32 scale = rsx::get_resolution_scale();
@@ -1945,7 +1986,22 @@ namespace rsx
 
 			blitter.scale_image(vram_texture, dest_texture, src_area, dst_area, interpolate, is_depth_blit);
 			notify_surface_changed(dst.rsx_address);
-			return true;
+
+			blit_op_result result = true;
+			result.is_depth = is_depth_blit;
+
+			if (cached_dest)
+			{
+				result.real_dst_address = cached_dest->get_section_base();
+				result.real_dst_size = cached_dest->get_section_size();
+			}
+			else
+			{
+				result.real_dst_address = dst.rsx_address;
+				result.real_dst_size = dst.pitch * dst_dimensions.height;
+			}
+
+			return result;
 		}
 
 		void do_update()
