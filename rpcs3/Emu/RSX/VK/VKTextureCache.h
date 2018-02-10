@@ -236,11 +236,7 @@ namespace vk
 				}
 				else
 				{
-					auto typed_dst = (T *)pixels_dst;
-					auto typed_src = (T *)pixels_src;
-
-					for (u32 px = 0; px < block_size; ++px)
-						typed_dst[px] = typed_src[px];
+					memcpy(pixels_dst, pixels_src, block_size * sizeof(T));
 				}
 			}
 		}
