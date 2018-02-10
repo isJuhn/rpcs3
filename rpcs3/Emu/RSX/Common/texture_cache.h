@@ -1013,7 +1013,10 @@ namespace rsx
 					if (tex->is_locked())
 					{
 						if (!tex->is_synchronized())
+						{
+							record_cache_miss(*tex);
 							tex->copy_texture(true, std::forward<Args>(extras)...);
+						}
 
 						m_cache[get_block_address(tex->get_section_base())].remove_one();
 					}
@@ -1074,7 +1077,7 @@ namespace rsx
 				return;
 			}
 
-			value.misses++;
+			value.misses += 2;
 		}
 
 		template <typename ...Args>
@@ -1878,12 +1881,6 @@ namespace rsx
 
 			if (cached_dest)
 			{
-				if (!cached_dest->is_locked())
-				{
-					cached_dest->reprotect(utils::protection::no);
-					m_cache[get_block_address(cached_dest->get_section_base())].notify();
-				}
-
 				//Prep surface
 				auto channel_order = src_is_render_target ? rsx::texture_create_flags::native_component_order :
 					dst_is_argb8 ? rsx::texture_create_flags::default_component_order :
@@ -1923,6 +1920,16 @@ namespace rsx
 					channel_order, default_remap_vector)->get_raw_texture();
 
 				m_texture_memory_in_use += dst.pitch * dst_dimensions.height;
+			}
+			else if (cached_dest)
+			{
+				if (!cached_dest->is_locked())
+				{
+					lock.upgrade();
+
+					cached_dest->reprotect(utils::protection::no);
+					m_cache[get_block_address(cached_dest->get_section_base())].notify();
+				}
 			}
 
 			const f32 scale = rsx::get_resolution_scale();
