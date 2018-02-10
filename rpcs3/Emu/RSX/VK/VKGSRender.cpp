@@ -627,6 +627,9 @@ VKGSRender::VKGSRender() : GSRender()
 	m_depth_converter.reset(new vk::depth_convert_pass());
 	m_depth_converter->create(*m_device);
 
+	m_depth_scaler.reset(new vk::depth_scaling_pass());
+	m_depth_scaler->create(*m_device);
+
 	m_prog_buffer.reset(new VKProgramBuffer(m_render_passes.data()));
 
 	if (g_cfg.video.disable_vertex_cache)
@@ -749,6 +752,10 @@ VKGSRender::~VKGSRender()
 	//RGBA->depth cast helper
 	m_depth_converter->destroy();
 	m_depth_converter.reset();
+
+	//Depth surface blitter
+	m_depth_scaler->destroy();
+	m_depth_scaler.reset();
 
 	//Pipeline descriptors
 	vkDestroyPipelineLayout(*m_device, pipeline_layout, nullptr);
@@ -1999,6 +2006,7 @@ void VKGSRender::process_swap_request(frame_context_t *ctx, bool free_resources)
 		}
 
 		m_depth_converter->free_resources();
+		m_depth_scaler->free_resources();
 		m_ui_renderer->free_resources();
 
 		ctx->buffer_views_to_clean.clear();
@@ -2740,7 +2748,7 @@ void VKGSRender::prepare_rtts(rsx::framebuffer_creation_context context)
 
 			const u32 range = pitch * m_depth_surface_info.height * aa_factor;
 			m_texture_cache.lock_memory_region(std::get<1>(m_rtts.m_bound_depth_stencil), m_depth_surface_info.address, range,
-				m_depth_surface_info.width, m_depth_surface_info.height, m_depth_surface_info.pitch, gcm_format, true);
+				m_depth_surface_info.width, m_depth_surface_info.height, m_depth_surface_info.pitch, gcm_format, false);
 		}
 	}
 
@@ -3172,11 +3180,36 @@ bool VKGSRender::scaled_image_from_memory(rsx::blit_src_info& src, rsx::blit_dst
 	//Verify enough memory exists before attempting to handle data transfer
 	check_heap_status();
 
+	//Stop all parallel operations until this is finished
+	std::lock_guard<std::mutex> lock(m_secondary_cb_guard);
+
 	auto result = m_texture_cache.blit(src, dst, interpolate, m_rtts, *m_current_command_buffer);
 	m_current_command_buffer->begin();
 
+	if (auto deferred_op_dst = std::get<1>(result))
+	{
+		//Requires manual scaling; depth/stencil surface
+		auto deferred_op_src = std::get<2>(result);
+		auto src_view = std::get<3>(result);
+
+		auto rp = vk::get_render_pass_location(VK_FORMAT_UNDEFINED, deferred_op_dst->info.format, 0);
+		auto render_pass = m_render_passes[rp];
+
+		auto old_src_layout = deferred_op_src->current_layout;
+		auto old_dst_layout = deferred_op_dst->current_layout;
+
+		vk::change_image_layout(*m_current_command_buffer, deferred_op_src, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+		m_depth_scaler->run(*m_current_command_buffer, deferred_op_dst->width(), deferred_op_dst->height(), deferred_op_dst,
+			src_view, render_pass, m_framebuffers_to_clean);
+
+		vk::change_image_layout(*m_current_command_buffer, deferred_op_src, old_src_layout);
+		vk::change_image_layout(*m_current_command_buffer, deferred_op_dst, old_dst_layout);
+	}
+
 	m_samplers_dirty.store(true);
-	return result;
+	return std::get<0>(result);
 }
 
 void VKGSRender::clear_zcull_stats(u32 type)

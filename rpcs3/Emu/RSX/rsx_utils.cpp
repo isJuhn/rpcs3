@@ -364,16 +364,61 @@ namespace rsx
 		}
 	}
 
-	void convert_f32_to_d24(void *dst, void *src, u32 row_length_in_texels, u32 num_rows)
+	void convert_le_f32_to_be_d24(void *dst, void *src, u32 row_length_in_texels, u32 num_rows)
 	{
-		//TODO: Optimize this with sse/avx
-		be_t<u32>* casted_dst = (be_t<u32>*)dst;
-		be_t<f32>* casted_src = (be_t<f32>*)src;
-
 		const u32 num_pixels = row_length_in_texels * num_rows;
-		for (u32 n = 0; n < num_pixels; ++n)
+		verify(HERE), (num_pixels & 3) == 0;
+
+		const auto num_iterations = (num_pixels >> 2);
+
+		__m128i* dst_ptr = (__m128i*)dst;
+		__m128i* src_ptr = (__m128i*)src;
+
+		const __m128 scale_vector = _mm_set1_ps(16777214.f);
+		const __m128i swap_mask = _mm_set_epi8
+		(
+			0xF, 0xC, 0xD, 0xE,
+			0xB, 0x8, 0x9, 0xA,
+			0x7, 0x4, 0x5, 0x6,
+			0x3, 0x0, 0x1, 0x2
+		);
+
+		for (u32 n = 0; n < num_iterations; ++n)
 		{
-			casted_dst[n] = (u32)(casted_src[n] * 0x7FFFFFFF);
+			const __m128i src_vector = _mm_loadu_si128(src_ptr);
+			const __m128i result = _mm_cvtps_epi32(_mm_mul_ps((__m128&)src_vector, scale_vector));
+			const __m128i shuffled_vector = _mm_shuffle_epi8(result, swap_mask);
+			_mm_stream_si128(dst_ptr, shuffled_vector);
+			++dst_ptr;
+			++src_ptr;
+		}
+	}
+
+	void convert_le_d24x8_to_be_d24x8(void *dst, void *src, u32 row_length_in_texels, u32 num_rows)
+	{
+		const u32 num_pixels = row_length_in_texels * num_rows;
+		verify(HERE), (num_pixels & 3) == 0;
+
+		const auto num_iterations = (num_pixels >> 2);
+
+		__m128i* dst_ptr = (__m128i*)dst;
+		__m128i* src_ptr = (__m128i*)src;
+
+		const __m128i swap_mask = _mm_set_epi8
+		(
+			0xF, 0xC, 0xD, 0xE,
+			0xB, 0x8, 0x9, 0xA,
+			0x7, 0x4, 0x5, 0x6,
+			0x3, 0x0, 0x1, 0x2
+		);
+
+		for (u32 n = 0; n < num_iterations; ++n)
+		{
+			const __m128i src_vector = _mm_loadu_si128(src_ptr);
+			const __m128i shuffled_vector = _mm_shuffle_epi8(src_vector, swap_mask);
+			_mm_stream_si128(dst_ptr, shuffled_vector);
+			++dst_ptr;
+			++src_ptr;
 		}
 	}
 }

@@ -399,6 +399,26 @@ namespace vk
 		image->current_layout = new_layout;
 	}
 
+	void change_image_layout(VkCommandBuffer cmd, vk::image *image, VkImageLayout new_layout)
+	{
+		if (image->current_layout == new_layout) return;
+
+		VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT;
+		switch (image->info.format)
+		{
+		case VK_FORMAT_D16_UNORM:
+			flags = VK_IMAGE_ASPECT_DEPTH_BIT;
+			break;
+		case VK_FORMAT_D24_UNORM_S8_UINT:
+		case VK_FORMAT_D32_SFLOAT_S8_UINT:
+			flags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			break;
+		}
+
+		change_image_layout(cmd, image->value, image->current_layout, new_layout, { flags, 0, 1, 0, 1 });
+		image->current_layout = new_layout;
+	}
+
 	void insert_texture_barrier(VkCommandBuffer cmd, VkImage image, VkImageLayout layout, VkImageSubresourceRange range)
 	{
 		VkImageMemoryBarrier barrier = {};
