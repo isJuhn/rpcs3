@@ -165,8 +165,8 @@ namespace vk
 				cmd.begin();
 			}
 
-			const u16 internal_width = std::min(width, rsx::apply_resolution_scale(width, true));
-			const u16 internal_height = std::min(height, rsx::apply_resolution_scale(height, true));
+			const u16 internal_width = (context != rsx::texture_upload_context::framebuffer_storage? width : std::min(width, rsx::apply_resolution_scale(width, true)));
+			const u16 internal_height = (context != rsx::texture_upload_context::framebuffer_storage? height : std::min(height, rsx::apply_resolution_scale(height, true)));
 
 			VkImageAspectFlags aspect_flag = VK_IMAGE_ASPECT_COLOR_BIT;
 			switch (vram_texture->info.format)

@@ -170,8 +170,8 @@ namespace gl
 
 		void init_buffer()
 		{
-			const f32 resolution_scale = rsx::get_resolution_scale();
-			const u32 real_buffer_size = (resolution_scale < 1.f) ? cpu_address_range : (u32)(resolution_scale * resolution_scale * cpu_address_range);
+			const f32 resolution_scale = (context == rsx::texture_upload_context::framebuffer_storage? rsx::get_resolution_scale() : 1.f);
+			const u32 real_buffer_size = (resolution_scale <= 1.f) ? cpu_address_range : (u32)(resolution_scale * resolution_scale * cpu_address_range);
 			const u32 buffer_size = align(real_buffer_size, 4096);
 
 			if (pbo_id)
@@ -198,9 +198,6 @@ namespace gl
 		{
 			rsx::protection_policy policy = g_cfg.video.strict_rendering_mode ? rsx::protection_policy::protect_policy_full_range : rsx::protection_policy::protect_policy_conservative;
 			rsx::buffered_section::reset(base, size, policy);
-
-			if (flushable)
-				init_buffer();
 
 			flushed = false;
 			synchronized = false;
@@ -306,6 +303,11 @@ namespace gl
 				return;
 			}
 
+			if (!pbo_id)
+			{
+				init_buffer();
+			}
+
 			u32 target_texture = vram_texture;
 			if ((rsx::get_resolution_scale_percent() != 100 && context == rsx::texture_upload_context::framebuffer_storage) ||
 				(real_pitch != rsx_pitch))
@@ -399,7 +401,7 @@ namespace gl
 					}
 				}
 
-				if (!recovered && rsx::get_resolution_scale_percent() != 100)
+				if (!recovered && rsx::get_resolution_scale_percent() != 100 && context == rsx::texture_upload_context::framebuffer_storage)
 				{
 					LOG_ERROR(RSX, "Texture readback failed. Disable resolution scaling to get the 'Write Color Buffers' option to work properly");
 				}
