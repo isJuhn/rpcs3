@@ -418,12 +418,15 @@ s32 _sys_printf(ppu_thread& ppu, vm::cptr<char> fmt, ppu_va_args_t va_args)
 {
 	sysPrxForUser.warning("_sys_printf(fmt=%s, ...)", fmt);
 
+	std::string result;
+
 	if (g_tty)
 	{
-		g_tty.write(ps3_fmt(ppu, fmt, va_args.count));
+		result = ps3_fmt(ppu, fmt, va_args.count);
+		g_tty.write(result);
 	}
 
-	return CELL_OK;
+	return static_cast<s32>(result.size());
 }
 
 s32 _sys_sprintf(ppu_thread& ppu, vm::ptr<char> buffer, vm::cptr<char> fmt, ppu_va_args_t va_args)
@@ -437,19 +440,41 @@ s32 _sys_sprintf(ppu_thread& ppu, vm::ptr<char> buffer, vm::cptr<char> fmt, ppu_
 	return static_cast<s32>(result.size());
 }
 
-s32 _sys_vprintf()
+s32 _sys_vprintf(ppu_thread& ppu, vm::cptr<char> fmt, ppu_va_args_t va_args)
 {
-	fmt::throw_exception("Unimplemented" HERE);
+	sysPrxForUser.warning("_sys_vprintf(fmt=%s, ...)", fmt);
+
+	std::string result;
+
+	if (g_tty)
+	{
+		result = ps3_fmt(ppu, fmt, va_args.count);
+		g_tty.write(result);
+	}
+
+	return static_cast<s32>(result.size());
 }
 
-s32 _sys_vsnprintf()
+s32 _sys_vsnprintf(ppu_thread& ppu, vm::ptr<char> buffer, u32 n, vm::cptr<char> fmt, ppu_va_args_t va_args)
 {
-	fmt::throw_exception("Unimplemented" HERE);
+	sysPrxForUser.warning("_sys_vsnprintf(buffer=*0x%x, n=%d, fmt=%s, ...", buffer, n, fmt);
+
+	std::string result = ps3_fmt(ppu, fmt, va_args.count);
+
+	std::memcpy(buffer.get_ptr(), result.c_str(), n - 1);
+
+	return static_cast<s32>(result.size());
 }
 
-s32 _sys_vsprintf()
+s32 _sys_vsprintf(ppu_thread& ppu, vm::ptr<char> buffer, vm::cptr<char> fmt, ppu_va_args_t va_args)
 {
-	fmt::throw_exception("Unimplemented" HERE);
+	sysPrxForUser.warning("_sys_vsprintf(buffer=*0x%x, fmt=%s, ...", buffer, fmt);
+
+	std::string result = ps3_fmt(ppu, fmt, va_args.count);
+
+	std::memcpy(buffer.get_ptr(), result.c_str(), result.size() + 1);
+
+	return static_cast<s32>(result.size());
 }
 
 s32 _sys_qsort()
