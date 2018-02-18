@@ -455,15 +455,24 @@ s32 _sys_vprintf(ppu_thread& ppu, vm::cptr<char> fmt, ppu_va_args_t va_args)
 	return static_cast<s32>(result.size());
 }
 
-s32 _sys_vsnprintf(ppu_thread& ppu, vm::ptr<char> buffer, u32 n, vm::cptr<char> fmt, ppu_va_args_t va_args)
+s32 _sys_vsnprintf(ppu_thread& ppu, vm::ptr<char> dst, u32 count, vm::cptr<char> fmt, ppu_va_args_t va_args)
 {
-	sysPrxForUser.warning("_sys_vsnprintf(buffer=*0x%x, n=%d, fmt=%s, ...", buffer, n, fmt);
+	sysPrxForUser.warning("_sys_vsnprintf(buffer=*0x%x, n=%d, fmt=%s, ...", dst, count, fmt);
 
 	std::string result = ps3_fmt(ppu, fmt, va_args.count);
 
-	std::memcpy(buffer.get_ptr(), result.c_str(), n - 1);
+	if (!count)
+	{
+		return 0; // ???
+	}
+	else
+	{
+		count = (u32)std::min<size_t>(count - 1, result.size());
 
-	return static_cast<s32>(result.size());
+		std::memcpy(dst.get_ptr(), result.c_str(), count);
+		dst[count] = 0;
+		return count;
+	}
 }
 
 s32 _sys_vsprintf(ppu_thread& ppu, vm::ptr<char> buffer, vm::cptr<char> fmt, ppu_va_args_t va_args)
