@@ -3,6 +3,8 @@
 
 #include "sceNp.h"
 #include "sceNp2.h"
+#include "cellSysutil.h"
+#include "Emu/IdManager.h"
 
 logs::channel sceNp2("sceNp2");
 
@@ -133,9 +135,18 @@ s32 sceNpMatching2GetLobbyMemberDataInternal()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2ContextStart()
+s32 sceNpMatching2ContextStart(SceNpMatching2ContextId ctxId)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2ContextStart(ctxId=0x%x)", ctxId);
+
+	sysutil_register_cb([=](ppu_thread& ppu) -> s32
+	{
+		const auto matching2Context = fxm::get_always<SceNpMatching2Context_t>();
+
+		matching2Context->cbFunc(ppu, ctxId, SCE_NP_MATCHING2_CONTEXT_EVENT_Start, SCE_NP_MATCHING2_EVENT_CAUSE_CONTEXT_ACTION, 0, matching2Context->cbFuncArg);
+		return CELL_OK;
+	});
+
 	return CELL_OK;
 }
 
@@ -145,9 +156,14 @@ s32 sceNpMatching2CreateServerContext()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2GetMemoryInfo()
+s32 sceNpMatching2GetMemoryInfo(vm::ptr<SceNpMatching2MemoryInfo> memInfo)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2GetMemoryInfo(memInfo=*0x%x)", memInfo);
+
+	memInfo->curMemUsage = 0x2000;
+	memInfo->maxMemUsage = 0x40000;
+	memInfo->totalMemSize = 0x40000;
+
 	return CELL_OK;
 }
 
@@ -265,9 +281,14 @@ s32 sceNpMatching2SetSignalingOptParam()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2RegisterContextCallback()
+s32 sceNpMatching2RegisterContextCallback(ppu_thread& ppu, SceNpMatching2ContextId ctxId, vm::ptr<SceNpMatching2ContextCallback> cbFunc, vm::ptr<void> cbFuncArg)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2RegisterContextCallback(ctxId=0x%x, cbFunc=*0x%x, cbFuncArg=*0x%x)", ctxId, cbFunc, cbFuncArg);
+
+	const auto matching2Context = fxm::get_always<SceNpMatching2Context_t>();
+	matching2Context->cbFunc = cbFunc;
+	matching2Context->cbFuncArg = cbFuncArg;
+
 	return CELL_OK;
 }
 
@@ -313,9 +334,9 @@ s32 sceNpMatching2GrantRoomOwner()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2CreateContext()
+s32 sceNpMatching2CreateContext(vm::cptr<SceNpId> npId, vm::cptr<SceNpCommunicationId> commId, vm::cptr<SceNpCommunicationPassphrase> passPhrase, SceNpMatching2ContextId ctxId, s32 option)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2CreateContext(npId=*0x%x, commId=*0x%x, passPhrase=*0x%x, ctxId=0x%x, option=0x%x)", npId, commId, passPhrase, ctxId, option);
 	return CELL_OK;
 }
 
@@ -325,9 +346,14 @@ s32 sceNpMatching2GetSignalingOptParamLocal()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2RegisterSignalingCallback()
+s32 sceNpMatching2RegisterSignalingCallback(SceNpMatching2ContextId ctxId, vm::ptr<SceNpMatching2SignalingCallback> cbFunc, vm::ptr<void> cbFuncArg)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2RegisterSignalingCallback(ctxId=0x%x, cbFunc=*0x%x, cbFuncArg=*0x%x)", ctxId, cbFunc, cbFuncArg);
+
+	const auto matching2Signaling = fxm::get_always<SceNpMatching2Signaling_t>();
+	matching2Signaling->cbFunc = cbFunc;
+	matching2Signaling->cbFuncArg = cbFuncArg;
+
 	return CELL_OK;
 }
 
@@ -373,15 +399,23 @@ s32 sceNpMatching2DeleteServerContext()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2SetDefaultRequestOptParam()
+s32 sceNpMatching2SetDefaultRequestOptParam(SceNpMatching2ContextId ctxId, vm::cptr<SceNpMatching2RequestOptParam> optParam)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2SetDefaultRequestOptParam(ctxId=0x%x, optParam=*0x%x)", ctxId, optParam);
+
+	fxm::make_always<SceNpMatching2RequestOptParam>(*optParam);
+
 	return CELL_OK;
 }
 
-s32 sceNpMatching2RegisterRoomEventCallback()
+s32 sceNpMatching2RegisterRoomEventCallback(SceNpMatching2ContextId ctxId, vm::ptr<SceNpMatching2RoomEventCallback> cbFunc, vm::ptr<void> cbFuncArg)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2RegisterRoomEventCallback(ctxId=0x%x, cbFunc=*0x%x, cbFuncArg=*0x%x)", ctxId, cbFunc, cbFuncArg);
+
+	const auto matching2RoomEvent = fxm::get_always<SceNpMatching2RoomEvent_t>();
+	matching2RoomEvent->cbFunc = cbFunc;
+	matching2RoomEvent->cbFuncArg = cbFuncArg;
+
 	return CELL_OK;
 }
 

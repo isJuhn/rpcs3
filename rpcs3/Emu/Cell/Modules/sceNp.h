@@ -385,6 +385,27 @@ enum
 	SCE_NP_SCORE_MAX_CLAN_NUM_PER_TRANS  = 101,
 };
 
+enum
+{
+	SCE_NP_MANAGER_EVENT_GOT_TICKET = 255,
+};
+
+enum
+{
+	SCE_NP_TICKET_PARAM_SERIAL_ID          = 0,
+	SCE_NP_TICKET_PARAM_ISSUER_ID          = 1,
+	SCE_NP_TICKET_PARAM_ISSUED_DATE        = 2,
+	SCE_NP_TICKET_PARAM_EXPIRE_DATE        = 3,
+	SCE_NP_TICKET_PARAM_SUBJECT_ACCOUNT_ID = 4,
+	SCE_NP_TICKET_PARAM_SUBJECT_ONLINE_ID  = 5,
+	SCE_NP_TICKET_PARAM_SUBJECT_REGION     = 6,
+	SCE_NP_TICKET_PARAM_SUBJECT_DOMAIN     = 7,
+	SCE_NP_TICKET_PARAM_SERVICE_ID         = 8,
+	SCE_NP_TICKET_PARAM_SUBJECT_STATUS     = 9,
+	SCE_NP_TICKET_PARAM_STATUS_DURATION    = 10,
+	SCE_NP_TICKET_PARAM_SUBJECT_DOB        = 11,
+};
+
 // Constants for signaling functions and structures
 enum
 {
@@ -697,3 +718,26 @@ struct SceNpSignalingNetInfo
 
 // NP signaling callback function
 typedef void(*SceNpSignalingHandler)(u32 ctx_id, u32 subject_id, s32 event, s32 error_code, u32 arg_addr);
+
+struct SceNpManager_t
+{
+	vm::ptr<SceNpManagerCallback> callback;
+	vm::ptr<void> arg;
+};
+
+struct SceNpTicketVersion
+{
+	u16 major;
+	u16 minor;
+};
+
+union SceNpTicketParam
+{
+	s32 i32;
+	s64 i64;
+	u32 u32;
+	u64 u64;
+	SceNpDate date;
+	u8 data[256];
+};
+

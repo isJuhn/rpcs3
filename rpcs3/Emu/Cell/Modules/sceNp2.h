@@ -1505,3 +1505,21 @@ struct SceNpMatching2CbQueueInfo
 	be_t<u32> maxSessionMsgCbQueueLen;
 	u8 reserved[12];
 };
+
+struct SceNpMatching2Context_t
+{
+	vm::ptr<SceNpMatching2ContextCallback> cbFunc;
+	vm::ptr<void> cbFuncArg;
+};
+
+struct SceNpMatching2Signaling_t
+{
+	vm::ptr<SceNpMatching2SignalingCallback> cbFunc;
+	vm::ptr<void> cbFuncArg;
+};
+
+struct SceNpMatching2RoomEvent_t
+{
+	vm::ptr<SceNpMatching2RoomEventCallback> cbFunc;
+	vm::ptr<void> cbFuncArg;
+};

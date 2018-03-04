@@ -171,7 +171,7 @@ s32 cellSysutilGetSystemParamInt(CellSysutilParamId id, vm::ptr<s32> value)
 	break;
 
 	case CELL_SYSUTIL_SYSTEMPARAM_ID_CURRENT_USER_HAS_NP_ACCOUNT:
-		*value = 0;
+		*value = 1;
 	break;
 
 	case CELL_SYSUTIL_SYSTEMPARAM_ID_CAMERA_PLFREQ:

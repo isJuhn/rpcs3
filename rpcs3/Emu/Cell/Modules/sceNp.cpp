@@ -12,7 +12,7 @@
 
 logs::channel sceNp("sceNp");
 
-s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_OFFLINE;
+s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_ONLINE;
 
 s32 sceNpInit(u32 poolsize, vm::ptr<void> poolptr)
 {
@@ -221,9 +221,9 @@ s32 sceNpBasicRegisterHandler()
 	return CELL_OK;
 }
 
-s32 sceNpBasicRegisterContextSensitiveHandler()
+s32 sceNpBasicRegisterContextSensitiveHandler(vm::cptr<SceNpCommunicationId> context, vm::ptr<SceNpBasicEventHandler> handler, vm::ptr<void> arg)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpBasicRegisterContextSensitiveHandler(context=*0x%x, handler=*0x%x, arg=*0x%x)", context, handler, arg);
 	return CELL_OK;
 }
 
@@ -919,6 +919,10 @@ s32 sceNpManagerRegisterCallback(vm::ptr<SceNpManagerCallback> callback, vm::ptr
 		return SCE_NP_ERROR_INVALID_ARGUMENT;
 	}
 
+	const auto sceNpManager = fxm::get_always<SceNpManager_t>();
+	sceNpManager->callback = callback;
+	sceNpManager->arg = arg;
+
 	return CELL_OK;
 }
 
@@ -1006,6 +1010,9 @@ s32 sceNpManagerGetNpId(ppu_thread& ppu, vm::ptr<SceNpId> npId)
 		return SCE_NP_ERROR_INVALID_STATE;
 	}
 
+	strcpy(npId->handle.data, "0");
+	npId->handle.term = '\0';
+
 	return CELL_OK;
 }
 
@@ -1027,6 +1034,9 @@ s32 sceNpManagerGetOnlineName(vm::ptr<SceNpOnlineName> onlineName)
 	{
 		return SCE_NP_ERROR_INVALID_STATE;
 	}
+
+	strcpy(onlineName->data, "0");
+	onlineName->term = '\0';
 
 	return CELL_OK;
 }
@@ -1050,6 +1060,9 @@ s32 sceNpManagerGetAvatarUrl(vm::ptr<SceNpAvatarUrl> avatarUrl)
 		return SCE_NP_ERROR_INVALID_STATE;
 	}
 
+	strcpy(avatarUrl->data, "0");
+	avatarUrl->term = '\0';
+
 	return CELL_OK;
 }
 
@@ -1071,6 +1084,9 @@ s32 sceNpManagerGetMyLanguages(vm::ptr<SceNpMyLanguages> myLanguages)
 	{
 		return SCE_NP_ERROR_INVALID_STATE;
 	}
+	myLanguages->language1 = CELL_SYSUTIL_LANG_ENGLISH_GB;
+	myLanguages->language2 = CELL_SYSUTIL_LANG_ENGLISH_US;
+	sceNp.todo("sceNpManagerGetMyLanguages(myLanguages=*0x%x) returned englishes", myLanguages);
 
 	return CELL_OK;
 }
@@ -1170,9 +1186,20 @@ s32 sceNpManagerGetChatRestrictionFlag(vm::ptr<s32> isRestricted)
 	return CELL_OK;
 }
 
-s32 sceNpManagerGetCachedInfo()
+s32 sceNpManagerGetCachedInfo(u32 userId, vm::ptr<SceNpManagerCacheParam> param)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpManagerGetCachedInfo(userId=0x%x, param=*0x%x)", userId, param);
+
+	if (!param)
+	{
+		return SCE_NP_ERROR_INVALID_ARGUMENT;
+	}
+
+	strcpy(param->onlineId.data, "0");
+	strcpy(param->npId.handle.data, "0");
+	strcpy(param->onlineName.data, "0");
+	strcpy(param->avatarUrl.data, "0");
+
 	return CELL_OK;
 }
 
@@ -1188,33 +1215,89 @@ s32 sceNpManagerRequestTicket()
 	return CELL_OK;
 }
 
-s32 sceNpManagerRequestTicket2()
+s32 sceNpManagerRequestTicket2(vm::cptr<SceNpId> npId, vm::cptr<SceNpTicketVersion> version, vm::cptr<char> serviceId, vm::cptr<void> cookie, size_t cookieSize, vm::cptr<char> entitlementId, u32 consumedCount)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpManagerRequestTicket2(npId=*0x%x, version=*0x%x, serviceId=*0x%x, cookie=*0x%x, cookieSize=0x%x, entitlementId=*0x%x, consumedCount=0x%x)", npId, version, serviceId, cookie, cookieSize, entitlementId, consumedCount);
 	
 	if (g_psn_connection_status == SCE_NP_MANAGER_STATUS_OFFLINE)
 	{
 		return SCE_NP_ERROR_OFFLINE;
 	}
 	
+	sysutil_register_cb([=](ppu_thread& ppu) -> s32
+	{
+		const auto sceNpManager = fxm::get_always<SceNpManager_t>();
+
+		sceNpManager->callback(ppu, SCE_NP_MANAGER_EVENT_GOT_TICKET, 100, sceNpManager->arg.addr());
+		return CELL_OK;
+	});
+	
 	return CELL_OK;
 }
 
-s32 sceNpManagerGetTicket()
+s32 sceNpManagerGetTicket(vm::ptr<void> buffer, vm::ptr<size_t> bufferSize)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpManagerGetTicket(buffer=*0x%x, bufferSize=*0x%x)", buffer, bufferSize);
+
+	if (!bufferSize)
+	{
+		return SCE_NP_ERROR_INVALID_ARGUMENT;
+	}
+
+	if (!buffer)
+	{
+		*bufferSize = 100;
+	}
+
 	return CELL_OK;
 }
 
-s32 sceNpManagerGetTicketParam()
+s32 sceNpManagerGetTicketParam(s32 paramId, vm::ptr<SceNpTicketParam> param)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpManagerGetTicketParam(paramId=0x%x, param*0x%x)", paramId, param);
+
+	if (!param)
+	{
+		return SCE_NP_ERROR_INVALID_ARGUMENT;
+	}
+
+	switch (paramId)
+	{
+	case SCE_NP_TICKET_PARAM_SERIAL_ID:
+		break;
+	case SCE_NP_TICKET_PARAM_ISSUER_ID:
+		break;
+	case SCE_NP_TICKET_PARAM_ISSUED_DATE:
+		break;
+	case SCE_NP_TICKET_PARAM_EXPIRE_DATE:
+		break;
+	case SCE_NP_TICKET_PARAM_SUBJECT_ACCOUNT_ID:
+		break;
+	case SCE_NP_TICKET_PARAM_SUBJECT_ONLINE_ID:
+		break;
+	case SCE_NP_TICKET_PARAM_SUBJECT_REGION:
+		break;
+	case SCE_NP_TICKET_PARAM_SUBJECT_DOMAIN:
+		break;
+	case SCE_NP_TICKET_PARAM_SERVICE_ID:
+		break;
+	case SCE_NP_TICKET_PARAM_SUBJECT_STATUS:
+		break;
+	case SCE_NP_TICKET_PARAM_STATUS_DURATION:
+		break;
+	case SCE_NP_TICKET_PARAM_SUBJECT_DOB:
+		break;
+	default:
+		sceNp.error("Invalid SCE_NP_TICKET_PARAM ID: 0x%x", paramId);
+		return SCE_NP_ERROR_INVALID_ARGUMENT;
+	}
+
 	return CELL_OK;
 }
 
-s32 sceNpManagerGetEntitlementIdList()
+s32 sceNpManagerGetEntitlementIdList(vm::ptr<SceNpEntitlementId> entIdList, u32 entIdListNum)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpManagerGetEntitlementIdList(entIdList=*0x%x, entIdListNum=0x%x)", entIdList, entIdListNum);
 	return CELL_OK;
 }
 
@@ -1400,10 +1483,10 @@ s32 sceNpScoreTerm()
 	return CELL_OK;
 }
 
-s32 sceNpScoreCreateTitleCtx()
+s32 sceNpScoreCreateTitleCtx(vm::cptr<SceNpCommunicationId> communicationId, vm::cptr<SceNpCommunicationPassphrase> passphrase, vm::cptr<SceNpId> selfNpId)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
-	return CELL_OK;
+	sceNp.todo("sceNpScoreCreateTitleCtx(communicationId=*0x%x, passphrase=*0x%x, selfNpId=*0x%x)", communicationId, passphrase, selfNpId);
+	return 1;
 }
 
 s32 sceNpScoreDestroyTitleCtx()

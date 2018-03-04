@@ -165,6 +165,10 @@ error_code cellNetCtlGetInfo(s32 code, vm::ptr<CellNetCtlInfo> info)
 	{
 		info->http_proxy_config = 0;
 	}
+	else if (code == CELL_NET_CTL_INFO_PRIMARY_DNS)
+	{
+		strcpy_trunc(info->primary_dns, "212.71.239.147");
+	}
 
 	return CELL_OK;
 }
@@ -190,9 +194,9 @@ error_code cellNetCtlNetStartDialogAbortAsync()
 
 error_code cellNetCtlNetStartDialogUnloadAsync(vm::ptr<CellNetCtlNetStartDialogResult> result)
 {
-	cellNetCtl.warning("cellNetCtlNetStartDialogUnloadAsync(result=*0x%x)", result);
+	cellNetCtl.error("cellNetCtlNetStartDialogUnloadAsync(result=*0x%x)", result);
 
-	result->result = CELL_NET_CTL_ERROR_DIALOG_CANCELED;
+	result->result = 0;
 	sysutil_send_system_cmd(CELL_SYSUTIL_NET_CTL_NETSTART_UNLOADED, 0);
 
 	return CELL_OK;
