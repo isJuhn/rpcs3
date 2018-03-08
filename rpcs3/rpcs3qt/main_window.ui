@@ -141,7 +141,7 @@
      <x>0</x>
      <y>0</y>
      <width>1058</width>
-     <height>38</height>
+     <height>21</height>
     </rect>
    </property>
    <property name="contextMenuPolicy">
@@ -181,6 +181,7 @@
     <addaction name="sysPauseAct"/>
     <addaction name="sysStopAct"/>
     <addaction name="sysRebootAct"/>
+    <addaction name="actFrame_Advance"/>
     <addaction name="separator"/>
     <addaction name="sysSendOpenMenuAct"/>
     <addaction name="sysSendExitAct"/>
@@ -939,6 +940,24 @@
    </property>
    <property name="text">
     <string>Show Game Tool Bar</string>
+   </property>
+  </action>
+  <action name="actionEnable">
+   <property name="text">
+    <string>Enable</string>
+   </property>
+  </action>
+  <action name="actionDisable">
+   <property name="text">
+    <string>Disable</string>
+   </property>
+  </action>
+  <action name="actFrame_Advance">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Frame Advance</string>
    </property>
   </action>
  </widget>

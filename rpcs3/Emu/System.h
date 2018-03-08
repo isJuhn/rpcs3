@@ -182,6 +182,8 @@ class Emulator final
 	bool m_force_boot = false;
 
 public:
+	bool pause_next_frame = false;
+
 	Emulator() = default;
 
 	void SetCallbacks(EmuCallbacks&& cb)

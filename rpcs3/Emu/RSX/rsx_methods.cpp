@@ -1051,6 +1051,11 @@ namespace rsx
 
 			rsx->intr_thread->notify();
 		}
+		if (Emu.pause_next_frame)
+		{
+			Emu.pause_next_frame = false;
+			Emu.Pause();
+		}
 	}
 
 	void user_command(thread* rsx, u32, u32 arg)

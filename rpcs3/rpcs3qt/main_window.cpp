@@ -173,7 +173,20 @@ void main_window::CreateThumbnailToolbar()
 
 	connect(m_thumb_stop, &QWinThumbnailToolButton::clicked, [=]() { Emu.Stop(); });
 	connect(m_thumb_restart, &QWinThumbnailToolButton::clicked, [=]() { Emu.Restart(); });
-	connect(m_thumb_playPause, &QWinThumbnailToolButton::clicked, Pause);
+	connect(m_thumb_playPause, &QWinThumbnailToolButton::clicked, [=]() 
+	{
+		if (Emu.IsReady()) Emu.Run();
+		else if (Emu.IsPaused())
+		{
+			Emu.Resume();
+			if (guiSettings->GetValue(gui::m_frameAdvance).toBool())
+			{
+				Emu.pause_next_frame = true;
+			}
+		}
+		else if (Emu.IsRunning()) Emu.Pause();
+		else if (!Emu.GetBoot().empty()) Emu.Load();
+	});
 #endif
 }
 
@@ -1067,9 +1080,27 @@ void main_window::CreateConnects()
 	connect(ui->bootInstallPkgAct, &QAction::triggered, [this] {InstallPkg(); });
 	connect(ui->bootInstallPupAct, &QAction::triggered, [this] {InstallPup(); });
 	connect(ui->exitAct, &QAction::triggered, this, &QWidget::close);
-	connect(ui->sysPauseAct, &QAction::triggered, Pause);
+	connect(ui->sysPauseAct, &QAction::triggered, [=]()
+	{
+		if (Emu.IsReady()) Emu.Run();
+		else if (Emu.IsPaused())
+		{
+			Emu.Resume();
+			if (guiSettings->GetValue(gui::m_frameAdvance).toBool())
+			{
+				Emu.pause_next_frame = true;
+			}
+		}
+		else if (Emu.IsRunning()) Emu.Pause();
+		else if (!Emu.GetBoot().empty()) Emu.Load();
+	});
 	connect(ui->sysStopAct, &QAction::triggered, [=]() { Emu.Stop(); });
 	connect(ui->sysRebootAct, &QAction::triggered, [=]() { Emu.Restart(); });
+
+	connect(ui->actFrame_Advance, &QAction::triggered, [=](bool checked)
+	{
+		guiSettings->SetValue(gui::m_frameAdvance, checked);
+	});
 
 	connect(ui->sysSendOpenMenuAct, &QAction::triggered, [=]
 	{
@@ -1267,7 +1298,20 @@ void main_window::CreateConnects()
 	connect(ui->toolbar_disc, &QAction::triggered, this, &main_window::BootGame);
 	connect(ui->toolbar_refresh, &QAction::triggered, [=]() { m_gameListFrame->Refresh(true); });
 	connect(ui->toolbar_stop, &QAction::triggered, [=]() { Emu.Stop(); });
-	connect(ui->toolbar_start, &QAction::triggered, Pause);
+	connect(ui->toolbar_start, &QAction::triggered, [=]()
+	{
+		if (Emu.IsReady()) Emu.Run();
+		else if (Emu.IsPaused())
+		{
+			Emu.Resume();
+			if (guiSettings->GetValue(gui::m_frameAdvance).toBool())
+			{
+				Emu.pause_next_frame = true;
+			}
+		}
+		else if (Emu.IsRunning()) Emu.Pause();
+		else if (!Emu.GetBoot().empty()) Emu.Load();
+	});
 
 	connect(ui->toolbar_fullscreen, &QAction::triggered, [=]
 	{
@@ -1403,6 +1447,7 @@ void main_window::ConfigureGuiFromSettings(bool configure_all)
 	ui->showGameListAct->setChecked(guiSettings->GetValue(gui::mw_gamelist).toBool());
 	ui->showDebuggerAct->setChecked(guiSettings->GetValue(gui::mw_debugger).toBool());
 	ui->showToolBarAct->setChecked(guiSettings->GetValue(gui::mw_toolBarVisible).toBool());
+	ui->actFrame_Advance->setChecked(guiSettings->GetValue(gui::m_frameAdvance).toBool());
 
 	m_debuggerFrame->setVisible(ui->showDebuggerAct->isChecked());
 	m_logFrame->setVisible(ui->showLogAct->isChecked());
