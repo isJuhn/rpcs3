@@ -61,6 +61,7 @@ static s32 get_last_error(bool is_blocking, int native_error = 0)
 	{
 		ERROR_CASE(EWOULDBLOCK);
 		ERROR_CASE(EINPROGRESS);
+	case 10056:
 		ERROR_CASE(EALREADY);
 		ERROR_CASE(ENOTCONN);
 		ERROR_CASE(ECONNRESET);
@@ -444,7 +445,7 @@ s32 sys_net_bnet_connect(ppu_thread& ppu, s32 s, vm::ptr<sys_net_sockaddr> addr,
 			((sys_net_sockaddr_in*)addr.get_ptr())->sin_family = SYS_NET_AF_INET;
 			((sys_net_sockaddr_in*)addr.get_ptr())->sin_port   = 53;
 			((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr   = 0x08080808;
-			sys_net.warning("sys_net_bnet_connect(s=%d): using DNS 8.8.8.8:53...");
+			sys_net.warning("sys_net_bnet_connect(s=%d): using DNS 8.8.8.8:53...", s);
 		}
 		else if (addr->sa_family != SYS_NET_AF_INET)
 		{
