@@ -269,9 +269,18 @@ s32 sceNpMatching2KickoutRoomMember()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2ContextStartAsync()
+s32 sceNpMatching2ContextStartAsync(SceNpMatching2ContextId ctxId, u32 timeout)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2ContextStartAsync(ctxId=0x%x, timeout=0x%x)", ctxId, timeout);
+
+	sysutil_register_cb([=](ppu_thread& ppu) -> s32
+	{
+		const auto matching2Context = fxm::get_always<SceNpMatching2Context_t>();
+
+		matching2Context->cbFunc(ppu, ctxId, SCE_NP_MATCHING2_CONTEXT_EVENT_Start, SCE_NP_MATCHING2_EVENT_CAUSE_CONTEXT_ACTION, 0, matching2Context->cbFuncArg);
+		return CELL_OK;
+	});
+
 	return CELL_OK;
 }
 
@@ -316,9 +325,9 @@ s32 sceNpMatching2SignalingGetPingInfo()
 	return CELL_OK;
 }
 
-s32 sceNpMatching2GetServerIdListLocal()
+s32 sceNpMatching2GetServerIdListLocal(SceNpMatching2ContextId ctxId, vm::ptr<SceNpMatching2ServerId> serverId, u32 serverIdNum)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpMatching2GetServerIdListLocal(ctxId=0x%x, serverId=*0x%x, serverIdNum=0x%x)", ctxId, serverId, serverIdNum);
 	return CELL_OK;
 }
 
@@ -505,37 +514,37 @@ s32 sceNpMatching2SignalingGetPeerNetInfoResult()
 
 s32 sceNpAuthOAuthInit()
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpAuthOAuthInit()");
 	return CELL_OK;
 }
 
 s32 sceNpAuthOAuthTerm()
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpAuthOAuthTerm()");
 	return CELL_OK;
 }
 
 s32 sceNpAuthCreateOAuthRequest()
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpAuthCreateOAuthRequest()");
 	return CELL_OK;
 }
 
-s32 sceNpAuthDeleteOAuthRequest()
+s32 sceNpAuthDeleteOAuthRequest(SceNpAuthOAuthRequestId reqId)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpAuthDeleteOAuthRequest(reqId=0x%x)", reqId);
 	return CELL_OK;
 }
 
-s32 sceNpAuthAbortOAuthRequest()
+s32 sceNpAuthAbortOAuthRequest(SceNpAuthOAuthRequestId reqId)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpAuthAbortOAuthRequest(reqId=0x%x)", reqId);
 	return CELL_OK;
 }
 
-s32 sceNpAuthGetAuthorizationCode()
+s32 sceNpAuthGetAuthorizationCode(SceNpAuthOAuthRequestId reqId, vm::cptr<SceNpAuthGetAuthorizationCodeParameter> param, vm::ptr<SceNpAuthorizationCode> authCode, vm::ptr<s32> issuerId)
 {
-	UNIMPLEMENTED_FUNC(sceNp2);
+	sceNp2.todo("sceNpAuthGetAuthorizationCode(reqId=0x%x, param=*0x%x, authCode=*0x%x, issuerId=*0x%x)", reqId, param, authCode, issuerId);
 	return CELL_OK;
 }
 

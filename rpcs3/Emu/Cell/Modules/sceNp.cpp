@@ -14,6 +14,32 @@ logs::channel sceNp("sceNp");
 
 s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_ONLINE;
 
+template <>
+void fmt_class_string<SceNpTicketParamId>::format(std::string& out, u64 arg)
+{
+	format_enum(out, arg, [](SceNpTicketParamId value)
+	{
+		switch (value)
+		{
+			switch (value)
+		case SCE_NP_TICKET_PARAM_SERIAL_ID: return "SERIAL_ID";
+		case SCE_NP_TICKET_PARAM_ISSUER_ID: return "ISSUER_ID";
+		case SCE_NP_TICKET_PARAM_ISSUED_DATE: return "ISSUED_DATE";
+		case SCE_NP_TICKET_PARAM_EXPIRE_DATE: return "EXPIRE_DATE";
+		case SCE_NP_TICKET_PARAM_SUBJECT_ACCOUNT_ID: return "SUBJECT_ACCOUNT_ID";
+		case SCE_NP_TICKET_PARAM_SUBJECT_ONLINE_ID: return "SUBJECT_ONLINE_ID";
+		case SCE_NP_TICKET_PARAM_SUBJECT_REGION: return "SUBJECT_REGION";
+		case SCE_NP_TICKET_PARAM_SUBJECT_DOMAIN: return "SUBJECT_DOMAIN";
+		case SCE_NP_TICKET_PARAM_SERVICE_ID: return "SERVICE_ID";
+		case SCE_NP_TICKET_PARAM_SUBJECT_STATUS: return "SUBJECT_STATUS";
+		case SCE_NP_TICKET_PARAM_STATUS_DURATION: return "STATUS_DURATION";
+		case SCE_NP_TICKET_PARAM_SUBJECT_DOB: return "SUBJECT_DOB";
+		}
+
+		return unknown;
+	});
+}
+
 s32 sceNpInit(u32 poolsize, vm::ptr<void> poolptr)
 {
 	sceNp.warning("sceNpInit(poolsize=0x%x, poolptr=*0x%x)", poolsize, poolptr);
@@ -215,9 +241,9 @@ s32 sceNpDrmProcessExitSpawn2(ppu_thread& ppu, vm::cptr<u8> klicensee, vm::cptr<
 	return CELL_OK;
 }
 
-s32 sceNpBasicRegisterHandler()
+s32 sceNpBasicRegisterHandler(vm::cptr<SceNpCommunicationId> context, vm::ptr<SceNpBasicEventHandler> handler, vm::ptr<void> arg)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpBasicRegisterHandler(context=*0x%x, handler=*0x%x, arg=*0x%x)", context, handler, arg);
 	return CELL_OK;
 }
 
@@ -789,27 +815,27 @@ s32 sceNpLookupTerm()
 	return CELL_OK;
 }
 
-s32 sceNpLookupCreateTitleCtx()
+s32 sceNpLookupCreateTitleCtx(vm::cptr<SceNpCommunicationId> communicationId, vm::cptr<SceNpId> selfNpId)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpLookupCreateTitleCtx(communicationId=*0x%x, selfNpId=*0x%x)", communicationId, selfNpId);
+	return 1;
+}
+
+s32 sceNpLookupDestroyTitleCtx(s32 titleCtxId)
+{
+	sceNp.todo("sceNpLookupDestroyTitleCtx(titleCtxId=0x%x)", titleCtxId);
 	return CELL_OK;
 }
 
-s32 sceNpLookupDestroyTitleCtx()
+s32 sceNpLookupCreateTransactionCtx(s32 titleCtxId)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
-	return CELL_OK;
+	sceNp.todo("sceNpLookupCreateTransactionCtx(titleCtxId=0x%x)", titleCtxId);
+	return 1;
 }
 
-s32 sceNpLookupCreateTransactionCtx()
+s32 sceNpLookupDestroyTransactionCtx(s32 transId)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
-	return CELL_OK;
-}
-
-s32 sceNpLookupDestroyTransactionCtx()
-{
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpLookupDestroyTransactionCtx(transId=0x%x)", transId);
 	return CELL_OK;
 }
 
@@ -831,9 +857,9 @@ s32 sceNpLookupWaitAsync()
 	return CELL_OK;
 }
 
-s32 sceNpLookupPollAsync()
+s32 sceNpLookupPollAsync(s32 transId, vm::ptr<s32> result)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpLookupPollAsync(transId=0x%x, result=*0x%x)", transId, result);
 	return CELL_OK;
 }
 
@@ -904,9 +930,10 @@ s32 sceNpLookupTitleSmallStorage()
 	return CELL_OK;
 }
 
-s32 sceNpLookupTitleSmallStorageAsync()
+s32 sceNpLookupTitleSmallStorageAsync(s32 transId, vm::ptr<void> data, size_t maxSize, vm::ptr<size_t> contentLength, s32 prio, vm::ptr<void> option)
 {
-	UNIMPLEMENTED_FUNC(sceNp);
+	sceNp.todo("sceNpLookupTitleSmallStorageAsync(transId=0x%x, data=*0x%x, maxSize=0x%x, contentLength=*0x%x, prio=0x%x, option=*0x%x)", transId, data, maxSize, contentLength, prio, option);
+	*contentLength = 100;
 	return CELL_OK;
 }
 
@@ -1252,9 +1279,9 @@ s32 sceNpManagerGetTicket(vm::ptr<void> buffer, vm::ptr<size_t> bufferSize)
 	return CELL_OK;
 }
 
-s32 sceNpManagerGetTicketParam(s32 paramId, vm::ptr<SceNpTicketParam> param)
+s32 sceNpManagerGetTicketParam(SceNpTicketParamId paramId, vm::ptr<SceNpTicketParam> param)
 {
-	sceNp.todo("sceNpManagerGetTicketParam(paramId=0x%x, param*0x%x)", paramId, param);
+	sceNp.todo("sceNpManagerGetTicketParam(paramId=0x%x(%s), param*0x%x)", paramId, paramId, param);
 
 	if (!param)
 	{
@@ -1288,7 +1315,7 @@ s32 sceNpManagerGetTicketParam(s32 paramId, vm::ptr<SceNpTicketParam> param)
 	case SCE_NP_TICKET_PARAM_SUBJECT_DOB:
 		break;
 	default:
-		sceNp.error("Invalid SCE_NP_TICKET_PARAM ID: 0x%x", paramId);
+		sceNp.error("Invalid SceNpTicketParamId: 0x%x", paramId);
 		return SCE_NP_ERROR_INVALID_ARGUMENT;
 	}
 

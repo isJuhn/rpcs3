@@ -390,7 +390,7 @@ enum
 	SCE_NP_MANAGER_EVENT_GOT_TICKET = 255,
 };
 
-enum
+enum SceNpTicketParamId : s32
 {
 	SCE_NP_TICKET_PARAM_SERIAL_ID          = 0,
 	SCE_NP_TICKET_PARAM_ISSUER_ID          = 1,
@@ -727,16 +727,16 @@ struct SceNpManager_t
 
 struct SceNpTicketVersion
 {
-	u16 major;
-	u16 minor;
+	be_t<u16> major;
+	be_t<u16> minor;
 };
 
 union SceNpTicketParam
 {
-	s32 i32;
-	s64 i64;
-	u32 u32;
-	u64 u64;
+	be_t<s32> i32;
+	be_t<s64> i64;
+	be_t<u32> u32;
+	be_t<u64> u64;
 	SceNpDate date;
 	u8 data[256];
 };

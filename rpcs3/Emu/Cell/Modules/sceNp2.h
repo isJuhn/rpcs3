@@ -120,6 +120,12 @@ enum
 	SCE_NP_MATCHING2_SERVER_ERROR_ROOM_INCONSISTENCY        = 0x80022b32,
 	// SCE_NP_MATCHING2_NET_ERRNO_BASE   = 0x800224XX,
 	// SCE_NP_MATCHING2_NET_H_ERRNO_BASE = 0x800225XX,
+
+	SCE_NP_OAUTH_ERROR_ALREADY_INITIALIZED					= 0x80025f02,
+	SCE_NP_OAUTH_ERROR_NOT_INITIALIZED						= 0x80025f03,
+	SCE_NP_OAUTH_ERROR_ABORTED								= 0x80025f08,
+	SCE_NP_OAUTH_ERROR_REQUEST_NOT_FOUND					= 0x80025f0a,
+	SCE_NP_OAUTH_ERROR_REQUEST_MAX							= 0x80025f11,
 };
 
 // Constants for matching functions and structures
@@ -490,6 +496,7 @@ typedef u64 SceNpMatching2RoomJoinedSlotMask;
 typedef u16 SceNpMatching2Event;
 typedef u32 SceNpMatching2EventKey;
 typedef SceNpCommunicationPassphrase SceNpMatching2TitlePassphrase;
+typedef s32 SceNpAuthOAuthRequestId;
 
 // Request callback function
 using SceNpMatching2RequestCallback = void(SceNpMatching2ContextId ctxId, SceNpMatching2RequestId reqId, SceNpMatching2Event event, SceNpMatching2EventKey eventKey,
@@ -1504,6 +1511,25 @@ struct SceNpMatching2CbQueueInfo
 	be_t<u32> curSessionMsgCbQueueLen;
 	be_t<u32> maxSessionMsgCbQueueLen;
 	u8 reserved[12];
+};
+
+struct SceNpClientId
+{
+	u8 id[129];
+	u8 padding[7];
+};
+
+struct SceNpAuthGetAuthorizationCodeParameter
+{
+	be_t<u32> size;
+	vm::cptr<SceNpClientId> pClientId;
+	vm::cptr<char> pScope;
+};
+
+struct SceNpAuthorizationCode
+{
+	u8 code[129];
+	u8 padding[7];
 };
 
 struct SceNpMatching2Context_t
