@@ -167,7 +167,7 @@ error_code cellNetCtlGetInfo(s32 code, vm::ptr<CellNetCtlInfo> info)
 	}
 	else if (code == CELL_NET_CTL_INFO_PRIMARY_DNS)
 	{
-		strcpy_trunc(info->primary_dns, "212.71.239.147");
+		strcpy_trunc(info->primary_dns, "73.27.147.158");
 	}
 
 	return CELL_OK;
