@@ -42,3 +42,6 @@
 [submodule "3rdparty/pugixml"]
 	path = 3rdparty/pugixml
 	url = https://github.com/zeux/pugixml
+[submodule "3rdparty/IRCClient"]
+	path = 3rdparty/IRCClient
+	url = https://github.com/fredimachado/IRCClient.git

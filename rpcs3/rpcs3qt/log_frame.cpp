@@ -1,5 +1,6 @@
 #include "log_frame.h"
 #include "qt_utils.h"
+#include "chat_login_dialog.h"
 
 #include "stdafx.h"
 #include "rpcs3_version.h"
@@ -9,6 +10,7 @@
 #include <QActionGroup>
 #include <QScrollBar>
 #include <QTabBar>
+#include <QBoxLayout>
 
 extern atomic_t<s64> g_tty_size;
 
@@ -123,8 +125,26 @@ log_frame::log_frame(std::shared_ptr<gui_settings> guiSettings, QWidget *parent)
 	m_tty->setContextMenuPolicy(Qt::CustomContextMenu);
 	m_tty->installEventFilter(this);
 
+	m_irc = new QGroupBox(m_tabWidget);
+	m_irc->setObjectName("irc_frame");
+	m_irc->setTitle("#rpcs3 on freenode");
+	m_irc->setFlat(true);
+
+	QGridLayout* grid_box = new QGridLayout();
+	m_chat = new QTextEdit();
+	m_chat->setReadOnly(true);
+	m_chat_text = new QLineEdit();
+	m_send = new QPushButton();
+	m_send->setText("Login");
+	grid_box->addWidget(m_chat, 0, 0, 1, 2);
+	grid_box->addWidget(m_chat_text, 1, 0);
+	grid_box->addWidget(m_send, 1, 1);
+
+	m_irc->setLayout(grid_box);
+
 	m_tabWidget->addTab(m_log, tr("Log"));
 	m_tabWidget->addTab(m_tty, tr("TTY"));
+	m_tabWidget->addTab(m_irc, tr("IRC"));
 
 	setWidget(m_tabWidget);
 
@@ -132,6 +152,8 @@ log_frame::log_frame(std::shared_ptr<gui_settings> guiSettings, QWidget *parent)
 	m_tty_file.open(fs::get_config_dir() + "TTY.log", fs::read + fs::create);
 
 	CreateAndConnectActions();
+
+	m_nick = new QString();
 
 	// Check for updates every ~10 ms
 	QTimer *timer = new QTimer(this);
@@ -267,6 +289,28 @@ void log_frame::CreateAndConnectActions()
 		menu->addAction(m_clearTTYAct);
 		menu->exec(mapToGlobal(pos));
 	});
+
+	auto send_lambda = [=]()
+	{
+		if (m_nick->isEmpty())
+		{
+			chat_login_dialog* login_dialog = new chat_login_dialog(m_nick, m_irc);
+			login_dialog->show();
+		}
+		else if (!client.Connected())
+		{
+			InitIRC();
+		}
+		else
+		{
+			m_chat->append(m_chat_text->text());
+			client.SendIRC("PRIVMSG #rpcs3 " + m_chat_text->text().toStdString());
+		}
+	};
+
+	connect(m_send, &QAbstractButton::clicked, send_lambda);
+	connect(m_chat_text, &QLineEdit::returnPressed, send_lambda);
+
 
 	connect(m_tabWidget, &QTabWidget::currentChanged, [this](int/* index*/)
 	{
@@ -454,4 +498,19 @@ bool log_frame::eventFilter(QObject* object, QEvent* event)
 	}
 
 	return QDockWidget::eventFilter(object, event);
+}
+
+void log_frame::InitIRC()
+{
+	client = Irc::IRCClient();
+	client.InitSocket();
+	client.HookIRCCommand("PRIVMSG", &MessageHandler);
+	client.Connect("chat.freenode.net", 6667);
+	client.Login(m_nick->toStdString(), m_nick->toStdString());
+	client.SendIRC("JOIN #rpcs3");
+}
+
+void log_frame::MessageHandler(Irc::IRCMessage msg, Irc::IRCClient* c)
+{
+
 }
