@@ -19,6 +19,7 @@ struct GameTrophiesData
 	std::vector<QPixmap> trophy_images;
 	std::string game_name;
 	std::string path;
+	std::string trophyUsrPath;
 };
 
 enum TrophyColumns

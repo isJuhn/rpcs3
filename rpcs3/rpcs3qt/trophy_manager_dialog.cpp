@@ -242,9 +242,9 @@ bool trophy_manager_dialog::LoadTrophyFolderToDB(const std::string& trop_name)
 
 	game_trophy_data->path = vfs::get(trophyPath + "/");
 	game_trophy_data->trop_usr.reset(new TROPUSRLoader());
-	std::string trophyUsrPath = trophyPath + "/TROPUSR.DAT";
+	game_trophy_data->trophyUsrPath = trophyPath + "/TROPUSR.DAT";
 	std::string trophyConfPath = trophyPath + "/TROPCONF.SFM";
-	bool success = game_trophy_data->trop_usr->Load(trophyUsrPath, trophyConfPath);
+	bool success = game_trophy_data->trop_usr->Load(game_trophy_data->trophyUsrPath, trophyConfPath);
 
 	fs::file config(vfs::get(trophyConfPath));
 
@@ -398,6 +398,7 @@ void trophy_manager_dialog::ShowContextMenu(const QPoint& loc)
 	}
 
 	QAction* show_trophy_dir = new QAction(tr("Open Trophy Dir"), menu);
+	QAction* unlock_trophy = new QAction(tr("Unlock Trophy"), menu);
 
 	// Only two levels in this tree (ignoring root). So getting the index as such works.
 	int db_ind;
@@ -405,10 +406,18 @@ void trophy_manager_dialog::ShowContextMenu(const QPoint& loc)
 	if (is_game_node)
 	{
 		db_ind = item->data(1, Qt::UserRole).toInt();
+		unlock_trophy->setEnabled(false);
 	}
 	else
 	{
 		db_ind = item->parent()->data(1, Qt::UserRole).toInt();
+
+		connect(unlock_trophy, &QAction::triggered, [=]()
+		{
+			m_trophies_db[db_ind]->trop_usr->UnlockTrophy(item->text(TrophyColumns::Id).toInt(), 0, 0);
+			m_trophies_db[db_ind]->trop_usr->Save(m_trophies_db[db_ind]->trophyUsrPath);
+		});
+		menu->addAction(unlock_trophy);
 	}
 
 	connect(show_trophy_dir, &QAction::triggered, [=]()
