@@ -354,9 +354,9 @@ bool trophy_manager_dialog::LoadTrophyFolderToDB(const std::string& trop_name)
 
 	game_trophy_data->path = vfs::get(trophyPath + "/");
 	game_trophy_data->trop_usr.reset(new TROPUSRLoader());
-	const std::string trophyUsrPath = trophyPath + "/TROPUSR.DAT";
+	game_trophy_data->trophyUsrPath = trophyPath + "/TROPUSR.DAT";
 	const std::string trophyConfPath = trophyPath + "/TROPCONF.SFM";
-	const bool success = game_trophy_data->trop_usr->Load(trophyUsrPath, trophyConfPath);
+	const bool success = game_trophy_data->trop_usr->Load(game_trophy_data->trophyUsrPath, trophyConfPath);
 
 	fs::file config(vfs::get(trophyConfPath));
 
@@ -661,8 +661,15 @@ void trophy_manager_dialog::ShowContextMenu(const QPoint& pos)
 
 	QMenu* menu = new QMenu();
 	QAction* show_trophy_dir = new QAction(tr("Open Trophy Directory"), menu);
+	QAction* unlock_trophy = new QAction(tr("Unlock Trophy"), menu);
 
 	const int db_ind = m_game_combo->currentData().toInt();
+
+	connect(unlock_trophy, &QAction::triggered, [=]()
+	{
+		m_trophies_db[db_ind]->trop_usr->UnlockTrophy(m_trophy_table->item(m_trophy_table->currentRow(), TrophyColumns::Id)->text().toInt(), 0, 0);
+		m_trophies_db[db_ind]->trop_usr->Save(m_trophies_db[db_ind]->trophyUsrPath);
+	});
 
 	connect(show_trophy_dir, &QAction::triggered, [=, this]()
 	{
@@ -670,6 +677,7 @@ void trophy_manager_dialog::ShowContextMenu(const QPoint& pos)
 		QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 	});
 
+	menu->addAction(unlock_trophy);
 	menu->addAction(show_trophy_dir);
 	menu->exec(m_trophy_table->viewport()->mapToGlobal(pos));
 }
