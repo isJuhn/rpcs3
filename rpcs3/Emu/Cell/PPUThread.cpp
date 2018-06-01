@@ -1013,6 +1013,11 @@ extern u64 ppu_ldarx(ppu_thread& ppu, u32 addr)
 	return ppu_load_acquire_reservation<u64>(ppu, addr);
 }
 
+extern void ppu_reservation_update(ppu_thread& ppu, u32 addr)
+{
+	vm::reservation_update(addr, 128);
+}
+
 const auto ppu_stwcx_tx = build_function_asm<bool(*)(u32 raddr, u64 rtime, u64 rdata, u32 value)>([](asmjit::X86Assembler& c, auto& args)
 {
 	using namespace asmjit;
@@ -1300,6 +1305,7 @@ extern void ppu_initialize(const ppu_module& info)
 			{ "__lvrx", s_use_ssse3 ? (u64)&sse_cellbe_lvrx : (u64)&sse_cellbe_lvrx_v0 },
 			{ "__stvlx", s_use_ssse3 ? (u64)&sse_cellbe_stvlx : (u64)&sse_cellbe_stvlx_v0 },
 			{ "__stvrx", s_use_ssse3 ? (u64)&sse_cellbe_stvrx : (u64)&sse_cellbe_stvrx_v0 },
+			{ "__resup", (u64)&ppu_reservation_update },
 		};
 
 		for (u64 index = 0; index < 1024; index++)

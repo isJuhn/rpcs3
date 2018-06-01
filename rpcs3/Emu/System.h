@@ -267,6 +267,8 @@ public:
 		return m_pause_amend_time;
 	}
 
+	bool m_use_accurate_reservation_updates = false;
+
 	bool BootGame(const std::string& path, bool direct = false, bool add_only = false);
 	bool BootRsxCapture(const std::string& path);
 	bool InstallPkg(const std::string& path);

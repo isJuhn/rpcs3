@@ -4405,7 +4405,12 @@ bool ppu_interpreter::LBZU(ppu_thread& ppu, ppu_opcode_t op)
 bool ppu_interpreter::STW(ppu_thread& ppu, ppu_opcode_t op)
 {
 	const u64 addr = op.ra ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
-	vm::write32(vm::cast(addr, HERE), (u32)ppu.gpr[op.rs]);
+	const u32 value = (u32)ppu.gpr[op.rs];
+	vm::write32(vm::cast(addr, HERE), value);
+	if (Emu.m_use_accurate_reservation_updates)
+	{
+		vm::reservation_update(addr, 128);
+	}
 	return true;
 }
 

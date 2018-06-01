@@ -3,6 +3,7 @@
 #include "PPUTranslator.h"
 #include "PPUThread.h"
 #include "PPUInterpreter.h"
+#include "Emu/System.h"
 
 #include "../Utilities/Log.h"
 #include <algorithm>
@@ -3408,6 +3409,11 @@ void PPUTranslator::STW(ppu_opcode_t op)
 	}
 
 	WriteMemory(op.ra ? m_ir->CreateAdd(GetGpr(op.ra), imm) : imm, GetGpr(op.rs, 32));
+
+	if (Emu.m_use_accurate_reservation_updates)
+	{
+		Call(GetType<void>(), "__resup", m_thread, op.ra ? m_ir->CreateAdd(GetGpr(op.ra), imm) : imm);
+	}
 }
 
 void PPUTranslator::STWU(ppu_opcode_t op)

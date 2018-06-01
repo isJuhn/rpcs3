@@ -2,6 +2,7 @@
 #include "PPUOpcodes.h"
 #include "PPUModule.h"
 #include "PPUAnalyser.h"
+#include "Emu/System.h"
 
 #include <unordered_set>
 
@@ -1092,6 +1093,9 @@ void ppu_module::analyse(u32 lib_toc, u32 entry)
 		{
 			auto& block = block_queue[j].get();
 
+			u32 sync_state = 0;
+			u32 sync_reg_used = 0;
+
 			for (vm::cptr<u32> _ptr = vm::cast(block.first); _ptr.addr() < func_end;)
 			{
 				const u32 iaddr = _ptr.addr();
@@ -1231,6 +1235,29 @@ void ppu_module::analyse(u32 lib_toc, u32 entry)
 					add_block(_ptr.addr());
 					block.second = _ptr.addr() - block.first;
 					break;
+				}
+				else if (type == ppu_itype::SYNC)
+				{
+					sync_state = 1;
+				}
+				else if (sync_state > 0)
+				{
+					if (sync_state == 1 && type == ppu_itype::ADDIS && (u16)op.simm16 == 0xaaaa)
+					{
+						sync_state = 2;
+						sync_reg_used = op.rd;
+					}
+					else if (sync_state == 2 && type == ppu_itype::ORI && (u16)op.simm16 == 0xaaaa && sync_reg_used == op.rs)
+					{
+						sync_state = 3;
+						sync_reg_used = op.ra;
+					}
+					else if (sync_state == 3 && type == ppu_itype::STW && op.rs == sync_reg_used)
+					{
+						sync_state = 0;
+						Emu.m_use_accurate_reservation_updates = true;
+						LOG_SUCCESS(PPU, "Reservation update identified, using accurate reservations");
+					}
 				}
 			}
 		}
