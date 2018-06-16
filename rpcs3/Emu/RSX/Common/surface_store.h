@@ -68,11 +68,22 @@ namespace rsx
 		GcmTileInfo *tile = nullptr;
 		rsx::surface_antialiasing write_aa_mode = rsx::surface_antialiasing::center_1_sample;
 
+		u16 raster_offset_x = 0;
+		u16 raster_offset_y = 0;
+		u32 raster_address_offset = 0;
+
 		virtual image_storage_type get_surface() = 0;
 		virtual u16 get_surface_width() const = 0;
 		virtual u16 get_surface_height() const = 0;
 		virtual u16 get_rsx_pitch() const = 0;
 		virtual u16 get_native_pitch() const = 0;
+
+		void set_raster_offset(u16 x, u16 y, u8 bpp)
+		{
+			raster_offset_x = x;
+			raster_offset_y = y;
+			raster_address_offset = (y * get_rsx_pitch()) + (x * bpp);
+		}
 
 		void save_aa_mode()
 		{
@@ -773,17 +784,29 @@ namespace rsx
 
 						return true;
 					}
-					else if (crop && info.surface_width > x_offset && info.surface_height > y_offset)
+					else
 					{
-						//Forcefully fit the requested region by clipping and scaling
-						u16 remaining_width = info.surface_width - x_offset;
-						u16 remaining_height = info.surface_height - y_offset;
+						if (crop) //Forcefully fit the requested region by clipping and scaling
+						{
+							u16 remaining_width = info.surface_width - x_offset;
+							u16 remaining_height = info.surface_height - y_offset;
+							
+							w = std::min(real_width, remaining_width);
+							h = std::min(real_height, remaining_height);
+							clipped = true;
+							
+							return true;
+						}
 
-						w = std::min(real_width, remaining_width);
-						h = std::min(real_height, remaining_height);
-						clipped = true;
-
-						return true;
+						if (info.surface_width >= real_width && info.surface_height >= real_height)
+						{
+							LOG_WARNING(RSX, "Overlapping surface exceeds bounds; returning full surface region");
+							w = real_width;
+							h = real_height;
+							clipped = true;
+							
+							return true;
+						}
 					}
 				}
 
