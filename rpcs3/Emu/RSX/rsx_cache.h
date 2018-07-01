@@ -378,6 +378,7 @@ namespace rsx
 			u64 pipeline_storage_hash;
 
 			u32 vp_ctrl;
+			u64 vp_instruction_mask[8];
 
 			u32 fp_ctrl;
 			u32 fp_texture_dimensions;
@@ -724,6 +725,15 @@ namespace rsx
 
 			vp.output_mask = data.vp_ctrl;
 
+			for (u8 index = 0; index < 8; index++)
+			{
+				u32 i = index * 64;
+				for (u8 count = 0; count < 64; ++count, ++i)
+				{
+					vp.instruction_mask[i] = !!(data.vp_instruction_mask[index] & (1 << count));
+				}
+			}
+
 			fp.ctrl = data.fp_ctrl;
 			fp.texture_dimensions = data.fp_texture_dimensions;
 			fp.unnormalized_coords = data.fp_unnormalized_coords;
@@ -753,6 +763,18 @@ namespace rsx
 			data_block.pipeline_storage_hash = m_storage.get_hash(pipeline);
 
 			data_block.vp_ctrl = vp.output_mask;
+
+			for (u8 index = 0; index < 8; index++)
+			{
+				u32 i = index * 64;
+				for (u8 count = 0; count < 64; ++count, ++i)
+				{
+					if (vp.instruction_mask[i])
+					{
+						data_block.vp_instruction_mask[index] |= (1 << count);
+					}
+				}
+			}
 
 			data_block.fp_ctrl = fp.ctrl;
 			data_block.fp_texture_dimensions = fp.texture_dimensions;
