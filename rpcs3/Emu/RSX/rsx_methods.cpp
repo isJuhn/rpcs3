@@ -340,9 +340,11 @@ namespace rsx
 				static constexpr u32 reg = index / 4;
 				static constexpr u8 subreg = index % 4;
 
-				u32 load = rsx::method_registers.transform_constant_load();
-				if ((load + index) >= 512)
+				const u32 load = rsx::method_registers.transform_constant_load();
+				const u32 address = load + reg;
+				if (address >= 468)
 				{
+					// Ignore addresses outside the usable [0, 467] range
 					LOG_ERROR(RSX, "Invalid transform register index (load=%d, index=%d)", load, index);
 					return;
 				}
@@ -1757,7 +1759,7 @@ namespace rsx
 		bind_range<NV4097_SET_TEXTURE_ADDRESS, 8, 16, nv4097::set_texture_dirty_bit>();
 		bind_range<NV4097_SET_TEXTURE_CONTROL0, 8, 16, nv4097::set_texture_dirty_bit>();
 		bind_range<NV4097_SET_TEXTURE_CONTROL1, 8, 16, nv4097::set_texture_dirty_bit>();
-		bind_range<NV4097_SET_TEXTURE_CONTROL2, 8, 16, nv4097::set_texture_dirty_bit>();
+		bind_range<NV4097_SET_TEXTURE_CONTROL2, 1, 16, nv4097::set_texture_dirty_bit>();
 		bind_range<NV4097_SET_TEXTURE_CONTROL3, 1, 16, nv4097::set_texture_dirty_bit>();
 		bind_range<NV4097_SET_TEXTURE_FILTER, 8, 16, nv4097::set_texture_dirty_bit>();
 		bind_range<NV4097_SET_TEXTURE_IMAGE_RECT, 8, 16, nv4097::set_texture_dirty_bit>();
