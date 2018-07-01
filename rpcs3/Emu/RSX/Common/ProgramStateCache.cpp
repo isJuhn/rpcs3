@@ -22,7 +22,7 @@ size_t vertex_program_utils::get_vertex_program_ucode_hash(const RSXVertexProgra
 	return hash;
 }
 
-vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vertex_program(const std::vector<u32>& data)
+vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vertex_program(const RSXVertexProgram& program)
 {
 	u32 ucode_size = 0;
 	u32 current_instrution = 0;
@@ -31,10 +31,10 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 	D2  d2;
 	D1  d1;
 
-	for (; ucode_size < data.size(); ucode_size += 4)
+	for (; ucode_size < program.data.size(); ucode_size += 4)
 	{
-		d1.HEX = data[ucode_size + 1];
-		d3.HEX = data[ucode_size + 3];
+		d1.HEX = program.data[ucode_size + 1];
+		d3.HEX = program.data[ucode_size + 3];
 
 		switch (d1.sca_opcode)
 		{
@@ -44,10 +44,18 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 		case RSX_SCA_OPCODE_CLI:
 		case RSX_SCA_OPCODE_CLB:
 		{
-			d2.HEX = data[ucode_size + 2];
+			d2.HEX = program.data[ucode_size + 2];
 
 			u32 jump_address = ((d2.iaddrh << 3) | d3.iaddrl) * 4;
-			last_instruction_address = std::max(last_instruction_address, jump_address);
+			if (jump_address >= program.entry_address)
+			{
+				jump_address -= program.entry_address;
+				last_instruction_address = std::max(last_instruction_address, jump_address);
+			}
+			else
+			{
+				LOG_ERROR(RSX, "Vertex program makes an undefined jump to an address before entry point!");
+			}
 			break;
 		}
 		}
@@ -60,7 +68,7 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 	}
 
 	// End marker was not found, process whole block
-	return { (u32)data.size() };
+	return { (u32)program.data.size() };
 }
 
 size_t vertex_program_storage_hash::operator()(const RSXVertexProgram &program) const

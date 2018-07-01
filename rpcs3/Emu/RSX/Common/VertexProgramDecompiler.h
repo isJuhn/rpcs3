@@ -58,6 +58,7 @@ struct VertexProgramDecompiler
 	std::stack<u32> m_call_stack;
 
 	const std::vector<u32>& m_data;
+	const RSXVertexProgram& m_prog;
 	ParamArray m_parr;
 
 	std::string NotZeroPositive(const std::string& code);

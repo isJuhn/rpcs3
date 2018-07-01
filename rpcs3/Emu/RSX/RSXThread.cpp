@@ -1402,6 +1402,7 @@ namespace rsx
 		const u32 transform_program_start = rsx::method_registers.transform_program_start();
 		current_vertex_program.output_mask = rsx::method_registers.vertex_attrib_output_mask();
 		current_vertex_program.skip_vertex_input_check = false;
+		current_vertex_program.entry_address = transform_program_start;
 
 		current_vertex_program.rsx_vertex_inputs.resize(0);
 		current_vertex_program.data.resize((512 - transform_program_start) * 4);
@@ -1411,7 +1412,7 @@ namespace rsx
 
 		memcpy(ucode_dst, ucode_src, current_vertex_program.data.size() * sizeof(u32));
 
-		current_vp_metadata = program_hash_util::vertex_program_utils::analyse_vertex_program(current_vertex_program.data);
+		current_vp_metadata = program_hash_util::vertex_program_utils::analyse_vertex_program(current_vertex_program);
 		current_vertex_program.data.resize(current_vp_metadata.ucode_size);
 
 		const u32 input_mask = rsx::method_registers.vertex_attrib_input_mask();

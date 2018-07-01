@@ -228,5 +228,6 @@ struct RSXVertexProgram
 	std::vector<u32> data;
 	std::vector<rsx_vertex_input> rsx_vertex_inputs;
 	u32 output_mask;
+	u32 entry_address;
 	bool skip_vertex_input_check;
 };

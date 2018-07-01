@@ -409,7 +409,7 @@ std::string VertexProgramDecompiler::BuildCode()
 }
 
 VertexProgramDecompiler::VertexProgramDecompiler(const RSXVertexProgram& prog) :
-	m_data(prog.data)
+	m_data(prog.data), m_prog(prog)
 {
 }
 
@@ -513,7 +513,7 @@ std::string VertexProgramDecompiler::Decompile()
 		AddCode(condition);
 		AddCode("{");
 		m_cur_instr->open_scopes++;
-		i = GetAddr();
+		i = GetAddr() - m_prog.entry_address;
 	};
 
 	auto do_function_return = [this, &i]()
@@ -579,7 +579,7 @@ std::string VertexProgramDecompiler::Decompile()
 		if (m_call_stack.empty())
 		{
 			//TODO: Subroutines can also have arbitrary jumps!
-			if (i && (is_has_BRA || std::find(m_jump_lvls.begin(), m_jump_lvls.end(), i) != m_jump_lvls.end()))
+			if (i && (is_has_BRA || std::find(m_jump_lvls.begin(), m_jump_lvls.end(), (i + m_prog.entry_address)) != m_jump_lvls.end()))
 			{
 				m_cur_instr->close_scopes++;
 				AddCode("}");

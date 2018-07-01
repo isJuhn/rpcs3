@@ -34,7 +34,7 @@ namespace program_hash_util
 
 		static size_t get_vertex_program_ucode_hash(const RSXVertexProgram &program);
 
-		static vertex_program_metadata analyse_vertex_program(const std::vector<u32>& data);
+		static vertex_program_metadata analyse_vertex_program(const RSXVertexProgram& data);
 	};
 
 	struct vertex_program_storage_hash
