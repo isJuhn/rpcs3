@@ -433,6 +433,12 @@ std::string VertexProgramDecompiler::Decompile()
 
 	while (i < data.size())
 	{
+		if (!m_prog.instruction_mask[i / 4])
+		{
+			// Dead code
+			continue;
+		}
+
 		if (is_has_BRA)
 		{
 			d3.HEX = data[i];
