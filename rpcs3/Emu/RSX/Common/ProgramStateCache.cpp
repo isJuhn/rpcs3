@@ -54,12 +54,13 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 
 		if (d3.end && (ucode_size >= last_instruction_address))
 		{
-			//Jumping over an end label is legal (verified)
-			break;
+			// Jumping over an end label is legal (verified)
+			return{ ucode_size + 4 };
 		}
 	}
 
-	return{ ucode_size + 4 };
+	// End marker was not found, process whole block
+	return { (u32)data.size() };
 }
 
 size_t vertex_program_storage_hash::operator()(const RSXVertexProgram &program) const
