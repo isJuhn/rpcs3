@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "ProgramStateCache.h"
 
+#include <stack>
+
 using namespace program_hash_util;
 
 size_t vertex_program_utils::get_vertex_program_ucode_hash(const RSXVertexProgram &program)
@@ -12,63 +14,151 @@ size_t vertex_program_utils::get_vertex_program_ucode_hash(const RSXVertexProgra
 	bool end = false;
 	for (unsigned i = 0; i < program.data.size() / 4; i++)
 	{
-		const qword inst = instbuffer[instIndex];
-		hash ^= inst.dword[0];
-		hash += (hash << 1) + (hash << 4) + (hash << 5) + (hash << 7) + (hash << 8) + (hash << 40);
-		hash ^= inst.dword[1];
-		hash += (hash << 1) + (hash << 4) + (hash << 5) + (hash << 7) + (hash << 8) + (hash << 40);
+		if (program.instruction_mask[i])
+		{
+			const qword inst = instbuffer[instIndex];
+			hash ^= inst.dword[0];
+			hash += (hash << 1) + (hash << 4) + (hash << 5) + (hash << 7) + (hash << 8) + (hash << 40);
+			hash ^= inst.dword[1];
+			hash += (hash << 1) + (hash << 4) + (hash << 5) + (hash << 7) + (hash << 8) + (hash << 40);
+		}
+
 		instIndex++;
 	}
 	return hash;
 }
 
-vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vertex_program(const RSXVertexProgram& program)
+vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vertex_program(const u32* data, u32 entry, RSXVertexProgram& dst_prog)
 {
-	u32 ucode_size = 0;
-	u32 current_instrution = 0;
+	vertex_program_utils::vertex_program_metadata result;
+	u32 current_instrution = entry;
 	u32 last_instruction_address = 0;
+	u32 first_instruction_address = entry;
+
+	std::stack<u32> call_stack;
+	std::pair<u32, u32> instruction_range = { UINT32_MAX, 0 };
+
 	D3  d3;
 	D2  d2;
 	D1  d1;
+	D0  d0;
 
-	for (; ucode_size < program.data.size(); ucode_size += 4)
+	while (true)
 	{
-		d1.HEX = program.data[ucode_size + 1];
-		d3.HEX = program.data[ucode_size + 3];
+		verify(HERE), current_instrution < 512;
+
+		if (result.instruction_mask[current_instrution])
+		{
+			// This can be harmless if a dangling RET was encountered before
+			LOG_ERROR(RSX, "vp_analyser: Possible infinite loop detected");
+			current_instrution++;
+			continue;
+		}
+
+		const qword* instruction = (const qword*)&data[current_instrution * 4];
+		d1.HEX = instruction->word[1];
+		d3.HEX = instruction->word[3];
+
+		// Touch current instruction
+		result.instruction_mask[current_instrution] = 1;
+		instruction_range.first = std::min(current_instrution, instruction_range.first);
+		instruction_range.second = std::max(current_instrution, instruction_range.second);
+
+		bool static_jump = false;
+		bool function_call = true;
 
 		switch (d1.sca_opcode)
 		{
-		case RSX_SCA_OPCODE_BRI:
-		case RSX_SCA_OPCODE_BRB:
-		case RSX_SCA_OPCODE_CAL:
-		case RSX_SCA_OPCODE_CLI:
-		case RSX_SCA_OPCODE_CLB:
-		{
-			d2.HEX = program.data[ucode_size + 2];
+			case RSX_SCA_OPCODE_BRI:
+			{
+				d0.HEX = instruction->word[0];
+				static_jump = (d0.cond == 0x7);
+				// Fall through
+			}
+			case RSX_SCA_OPCODE_BRB:
+			{
+				function_call = false;
+				// Fall through
+			}
+			case RSX_SCA_OPCODE_CAL:
+			case RSX_SCA_OPCODE_CLI:
+			case RSX_SCA_OPCODE_CLB:
+			{
+				d2.HEX = instruction->word[2];
+				const u32 jump_address = ((d2.iaddrh << 3) | d3.iaddrl);
 
-			u32 jump_address = ((d2.iaddrh << 3) | d3.iaddrl) * 4;
-			if (jump_address >= program.entry_address)
-			{
-				jump_address -= program.entry_address;
-				last_instruction_address = std::max(last_instruction_address, jump_address);
+				if (function_call)
+				{
+					call_stack.push(current_instrution + 1);
+					current_instrution = jump_address;
+					continue;
+				}
+				else if (static_jump)
+				{
+					current_instrution = jump_address;
+					continue;
+				}
+				else
+				{
+					// Set possible end address and proceed as usual
+					instruction_range.second = std::max(jump_address, instruction_range.second);
+				}
+
+				break;
 			}
-			else
+			case RSX_SCA_OPCODE_RET:
 			{
-				LOG_ERROR(RSX, "Vertex program makes an undefined jump to an address before entry point!");
+				if (call_stack.empty())
+				{
+					LOG_ERROR(RSX, "vp_analyser: RET found outside subroutine call");
+				}
+				else
+				{
+					current_instrution = call_stack.top();
+					call_stack.pop();
+					continue;
+				}
+
+				break;
 			}
+		}
+
+		if ((d3.end && current_instrution >= instruction_range.second) ||
+			(current_instrution + 1) == 512)
+		{
 			break;
 		}
-		}
 
-		if (d3.end && (ucode_size >= last_instruction_address))
+		current_instrution++;
+	}
+
+	const u32 instruction_count = (instruction_range.second - instruction_range.first + 1);
+	result.ucode_length = instruction_count * 16;
+
+	dst_prog.base_address = instruction_range.first;
+	dst_prog.entry = entry;
+	dst_prog.data.resize(instruction_count * 4);
+
+	for (u32 i = instruction_range.first, count = 0; i <= instruction_range.second; ++i, ++count)
+	{
+		dst_prog.instruction_mask[count] = result.instruction_mask[i];
+
+		const qword* instruction = (const qword*)&data[i * 4];
+		qword* dst = (qword*)&dst_prog.data[count * 4];
+
+		if (result.instruction_mask[i])
 		{
-			// Jumping over an end label is legal (verified)
-			return{ ucode_size + 4 };
+			dst->dword[0] = instruction->dword[0];
+			dst->dword[1] = instruction->dword[1];
+		}
+		else
+		{
+			dst->dword[0] = 0ull;
+			dst->dword[1] = 0ull;
 		}
 	}
 
-	// End marker was not found, process whole block
-	return { (u32)program.data.size() };
+	return result;
 }
 
 size_t vertex_program_storage_hash::operator()(const RSXVertexProgram &program) const

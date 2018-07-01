@@ -409,7 +409,7 @@ std::string VertexProgramDecompiler::BuildCode()
 }
 
 VertexProgramDecompiler::VertexProgramDecompiler(const RSXVertexProgram& prog) :
-	m_data(prog.data), m_prog(prog)
+	m_prog(prog)
 {
 }
 
@@ -418,7 +418,8 @@ std::string VertexProgramDecompiler::Decompile()
 	for (unsigned i = 0; i < PF_PARAM_COUNT; i++)
 		m_parr.params[i].clear();
 
-	m_instr_count = m_data.size() / 4;
+	const auto& data = m_prog.data;
+	m_instr_count = data.size() / 4;
 
 	for (int i = 0; i < m_max_instr_count; ++i)
 	{
@@ -430,16 +431,16 @@ std::string VertexProgramDecompiler::Decompile()
 	u32 i = 1;
 	u32 last_label_addr = 0;
 
-	while (i < m_data.size())
+	while (i < data.size())
 	{
 		if (is_has_BRA)
 		{
-			d3.HEX = m_data[i];
+			d3.HEX = data[i];
 			i += 4;
 		}
 		else
 		{
-			d1.HEX = m_data[i++];
+			d1.HEX = data[i++];
 
 			switch (d1.sca_opcode)
 			{
@@ -448,7 +449,7 @@ std::string VertexProgramDecompiler::Decompile()
 				LOG_ERROR(RSX, "Unimplemented VP opcode BRA");
 				is_has_BRA = true;
 				m_jump_lvls.clear();
-				d3.HEX = m_data[++i];
+				d3.HEX = data[++i];
 				i += 4;
 				break;
 			}
@@ -458,8 +459,8 @@ std::string VertexProgramDecompiler::Decompile()
 			case RSX_SCA_OPCODE_CLI:
 			case RSX_SCA_OPCODE_CLB:
 			{
-				d2.HEX = m_data[i++];
-				d3.HEX = m_data[i];
+				d2.HEX = data[i++];
+				d3.HEX = data[i];
 				i += 2;
 
 				const u32 label_addr = GetAddr();
@@ -469,26 +470,12 @@ std::string VertexProgramDecompiler::Decompile()
 			}
 			default:
 			{
-				d3.HEX = m_data[++i];
+				d3.HEX = data[++i];
 				i += 2;
 				break;
 			}
 			}
 		}
-	}
-
-	uint jump_position = 0;
-	if (is_has_BRA || !m_jump_lvls.empty())
-	{
-		m_cur_instr = &m_instructions[0];
-		AddCode("int jump_position = 0;");
-		AddCode("while (true)");
-		AddCode("{");
-		m_cur_instr->open_scopes++;
-
-		AddCode(fmt::format("if (jump_position <= %u)", jump_position++));
-		AddCode("{");
-		m_cur_instr->open_scopes++;
 	}
 
 	auto find_jump_lvl = [this](u32 address)
@@ -498,12 +485,12 @@ std::string VertexProgramDecompiler::Decompile()
 		for (auto pos : m_jump_lvls)
 		{
 			if (address == pos)
-				break;
+				return jump;
 
 			++jump;
 		}
 
-		return jump;
+		return UINT32_MAX;
 	};
 
 	auto do_function_call = [this, &i](const std::string& condition)
@@ -513,8 +500,28 @@ std::string VertexProgramDecompiler::Decompile()
 		AddCode(condition);
 		AddCode("{");
 		m_cur_instr->open_scopes++;
-		i = GetAddr() - m_prog.entry_address;
+		i = (GetAddr() - m_prog.base_address);
 	};
+
+	if (is_has_BRA || !m_jump_lvls.empty())
+	{
+		m_cur_instr = &m_instructions[0];
+
+		u32 jump_position = 0;
+		if (m_prog.entry != m_prog.base_address)
+		{
+			jump_position = find_jump_lvl(m_prog.entry);
+		}
+
+		AddCode(fmt::format("int jump_position = %u;", jump_position));
+		AddCode("while (true)");
+		AddCode("{");
+		m_cur_instr->open_scopes++;
+
+		AddCode("if (jump_position <= 0)");
+		AddCode("{");
+		m_cur_instr->open_scopes++;
+	}
 
 	auto do_function_return = [this, &i]()
 	{
@@ -554,15 +561,18 @@ std::string VertexProgramDecompiler::Decompile()
 
 	for (i = 0; i < m_instr_count; ++i)
 	{
-		if (m_call_stack.empty())
+		if (!m_prog.instruction_mask[i])
 		{
-			m_cur_instr = &m_instructions[i];
+			// Dead code, skip
+			continue;
 		}
 
-		d0.HEX = m_data[i * 4 + 0];
-		d1.HEX = m_data[i * 4 + 1];
-		d2.HEX = m_data[i * 4 + 2];
-		d3.HEX = m_data[i * 4 + 3];
+		m_cur_instr = &m_instructions[i];
+
+		d0.HEX = data[i * 4 + 0];
+		d1.HEX = data[i * 4 + 1];
+		d2.HEX = data[i * 4 + 2];
+		d3.HEX = data[i * 4 + 3];
 
 		src[0].src0l = d2.src0l;
 		src[0].src0h = d1.src0h;
@@ -576,16 +586,17 @@ std::string VertexProgramDecompiler::Decompile()
 			program_end = true;
 		}
 
-		if (m_call_stack.empty())
+		if (m_call_stack.empty() && i)
 		{
 			//TODO: Subroutines can also have arbitrary jumps!
-			if (i && (is_has_BRA || std::find(m_jump_lvls.begin(), m_jump_lvls.end(), (i + m_prog.entry_address)) != m_jump_lvls.end()))
+			u32 jump_position = find_jump_lvl(i + m_prog.base_address);
+			if (is_has_BRA || jump_position != UINT32_MAX)
 			{
 				m_cur_instr->close_scopes++;
 				AddCode("}");
 				AddCode("");
 
-				AddCode(fmt::format("if (jump_position <= %u)", jump_position++));
+				AddCode(fmt::format("if (jump_position <= %u)", jump_position));
 				AddCode("{");
 				m_cur_instr->open_scopes++;
 			}
