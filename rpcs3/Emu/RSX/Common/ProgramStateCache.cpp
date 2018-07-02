@@ -37,6 +37,8 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 
 	std::stack<u32> call_stack;
 	std::pair<u32, u32> instruction_range = { UINT32_MAX, 0 };
+	std::bitset<512> instructions_to_patch;
+	bool has_branch_instruction = false;
 
 	D3  d3;
 	D2  d2;
@@ -84,6 +86,10 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 			case RSX_SCA_OPCODE_CLI:
 			case RSX_SCA_OPCODE_CLB:
 			{
+				// Need to patch the jump address to be consistent wherever the program is located
+				instructions_to_patch[current_instrution] = true;
+				has_branch_instruction = true;
+
 				d2.HEX = instruction->word[2];
 				const u32 jump_address = ((d2.iaddrh << 3) | d3.iaddrl);
 
@@ -138,23 +144,46 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 	dst_prog.base_address = instruction_range.first;
 	dst_prog.entry = entry;
 	dst_prog.data.resize(instruction_count * 4);
+	dst_prog.instruction_mask = (result.instruction_mask >> instruction_range.first);
 
-	for (u32 i = instruction_range.first, count = 0; i <= instruction_range.second; ++i, ++count)
+	if (!has_branch_instruction)
 	{
-		dst_prog.instruction_mask[count] = result.instruction_mask[i];
-
-		const qword* instruction = (const qword*)&data[i * 4];
-		qword* dst = (qword*)&dst_prog.data[count * 4];
-
-		if (result.instruction_mask[i])
+		verify(HERE), instruction_range.first == entry;
+		std::memcpy(dst_prog.data.data(), data + (instruction_range.first * 4), result.ucode_length);
+	}
+	else
+	{
+		for (u32 i = instruction_range.first, count = 0; i <= instruction_range.second; ++i, ++count)
 		{
-			dst->dword[0] = instruction->dword[0];
-			dst->dword[1] = instruction->dword[1];
-		}
-		else
-		{
-			dst->dword[0] = 0ull;
-			dst->dword[1] = 0ull;
+			const qword* instruction = (const qword*)&data[i * 4];
+			qword* dst = (qword*)&dst_prog.data[count * 4];
+
+			if (result.instruction_mask[i])
+			{
+				dst->dword[0] = instruction->dword[0];
+				dst->dword[1] = instruction->dword[1];
+
+				if (instructions_to_patch[i])
+				{
+					d2.HEX = dst->word[2];
+					d3.HEX = dst->word[3];
+
+					u32 address = ((d2.iaddrh << 3) | d3.iaddrl);
+					address -= instruction_range.first;
+
+					d2.iaddrh = (address >> 3);
+					d3.iaddrl = (address & 0x7);
+					dst->word[2] = d2.HEX;
+					dst->word[3] = d3.HEX;
+
+					dst_prog.jump_table.emplace(address);
+				}
+			}
+			else
+			{
+				dst->dword[0] = 0ull;
+				dst->dword[1] = 0ull;
+			}
 		}
 	}
 
@@ -174,6 +203,8 @@ bool vertex_program_compare::operator()(const RSXVertexProgram &binary1, const R
 		return false;
 	if (binary1.data.size() != binary2.data.size())
 		return false;
+	if (binary1.jump_table != binary2.jump_table)
+		return false;
 	if (!binary1.skip_vertex_input_check && !binary2.skip_vertex_input_check && binary1.rsx_vertex_inputs != binary2.rsx_vertex_inputs)
 		return false;
 
@@ -182,10 +213,22 @@ bool vertex_program_compare::operator()(const RSXVertexProgram &binary1, const R
 	size_t instIndex = 0;
 	for (unsigned i = 0; i < binary1.data.size() / 4; i++)
 	{
-		const qword& inst1 = instBuffer1[instIndex];
-		const qword& inst2 = instBuffer2[instIndex];
-		if (inst1.dword[0] != inst2.dword[0] || inst1.dword[1] != inst2.dword[1])
+		const auto active = binary1.instruction_mask[instIndex];
+		if (active != binary2.instruction_mask[instIndex])
+		{
 			return false;
+		}
+
+		if (active)
+		{
+			const qword& inst1 = instBuffer1[instIndex];
+			const qword& inst2 = instBuffer2[instIndex];
+			if (inst1.dword[0] != inst2.dword[0] || inst1.dword[1] != inst2.dword[1])
+			{
+				return false;
+			}
+		}
+
 		instIndex++;
 	}
 

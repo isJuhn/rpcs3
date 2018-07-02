@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bitset>
+#include <set>
 
 enum vp_reg_type
 {
@@ -235,4 +236,5 @@ struct RSXVertexProgram
 	u32 base_address;
 	u32 entry;
 	std::bitset<512> instruction_mask;
+	std::set<u32> jump_table;
 };

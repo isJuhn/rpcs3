@@ -431,64 +431,11 @@ std::string VertexProgramDecompiler::Decompile()
 	u32 i = 1;
 	u32 last_label_addr = 0;
 
-	while (i < data.size())
-	{
-		if (!m_prog.instruction_mask[i / 4])
-		{
-			// Dead code
-			continue;
-		}
-
-		if (is_has_BRA)
-		{
-			d3.HEX = data[i];
-			i += 4;
-		}
-		else
-		{
-			d1.HEX = data[i++];
-
-			switch (d1.sca_opcode)
-			{
-			case RSX_SCA_OPCODE_BRA:
-			{
-				LOG_ERROR(RSX, "Unimplemented VP opcode BRA");
-				is_has_BRA = true;
-				m_jump_lvls.clear();
-				d3.HEX = data[++i];
-				i += 4;
-				break;
-			}
-			case RSX_SCA_OPCODE_BRB:
-			case RSX_SCA_OPCODE_BRI:
-			case RSX_SCA_OPCODE_CAL:
-			case RSX_SCA_OPCODE_CLI:
-			case RSX_SCA_OPCODE_CLB:
-			{
-				d2.HEX = data[i++];
-				d3.HEX = data[i];
-				i += 2;
-
-				const u32 label_addr = GetAddr();
-				last_label_addr = std::max(last_label_addr, label_addr);
-				m_jump_lvls.emplace(label_addr);
-				break;
-			}
-			default:
-			{
-				d3.HEX = data[++i];
-				i += 2;
-				break;
-			}
-			}
-		}
-	}
-
 	auto find_jump_lvl = [this](u32 address)
 	{
 		u32 jump = 1;
 
-		for (auto pos : m_jump_lvls)
+		for (auto pos : m_prog.jump_table)
 		{
 			if (address == pos)
 				return jump;
@@ -501,22 +448,24 @@ std::string VertexProgramDecompiler::Decompile()
 
 	auto do_function_call = [this, &i](const std::string& condition)
 	{
-		//call function
+		// Call function
+		// NOTE: Addresses are assumed to have been patched
 		m_call_stack.push(i+1);
 		AddCode(condition);
 		AddCode("{");
 		m_cur_instr->open_scopes++;
-		i = (GetAddr() - m_prog.base_address);
+		i = GetAddr();
 	};
 
-	if (is_has_BRA || !m_jump_lvls.empty())
+	if (is_has_BRA || !m_prog.jump_table.empty())
 	{
 		m_cur_instr = &m_instructions[0];
 
 		u32 jump_position = 0;
 		if (m_prog.entry != m_prog.base_address)
 		{
-			jump_position = find_jump_lvl(m_prog.entry);
+			jump_position = find_jump_lvl(m_prog.entry - m_prog.base_address);
+			verify(HERE), jump_position != UINT32_MAX;
 		}
 
 		AddCode(fmt::format("int jump_position = %u;", jump_position));
@@ -595,7 +544,7 @@ std::string VertexProgramDecompiler::Decompile()
 		if (m_call_stack.empty() && i)
 		{
 			//TODO: Subroutines can also have arbitrary jumps!
-			u32 jump_position = find_jump_lvl(i + m_prog.base_address);
+			u32 jump_position = find_jump_lvl(i);
 			if (is_has_BRA || jump_position != UINT32_MAX)
 			{
 				m_cur_instr->close_scopes++;
@@ -779,7 +728,7 @@ std::string VertexProgramDecompiler::Decompile()
 		}
 	}
 
-	if (is_has_BRA || !m_jump_lvls.empty())
+	if (is_has_BRA || !m_prog.jump_table.empty())
 	{
 		m_cur_instr = &m_instructions[m_instr_count - 1];
 		m_cur_instr->close_scopes++;
@@ -791,8 +740,6 @@ std::string VertexProgramDecompiler::Decompile()
 
 	std::string result = BuildCode();
 
-	m_jump_lvls.clear();
 	m_body.clear();
-
 	return result;
 }
