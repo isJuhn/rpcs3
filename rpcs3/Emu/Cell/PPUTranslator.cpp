@@ -3420,7 +3420,7 @@ void PPUTranslator::STW(ppu_opcode_t op)
 	{
 		if (ci->getZExtValue() == 0xAAAAAAAA)
 		{
-			Call(GetType<void>(), "__resupdate", m_thread, addr, m_ir->getInt32(128));
+			Call(GetType<void>(), "__resupdate", addr, m_ir->getInt32(128));
 		}
 	}
 }
