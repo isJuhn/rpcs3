@@ -1404,7 +1404,8 @@ namespace rsx
 		current_vertex_program.skip_vertex_input_check = skip_vertex_inputs;
 
 		current_vertex_program.rsx_vertex_inputs.resize(0);
-		current_vertex_program.data.reserve((512 - transform_program_start) * 4);
+		current_vertex_program.data.reserve(512 * 4);
+		current_vertex_program.jump_table.clear();
 
 		current_vp_metadata = program_hash_util::vertex_program_utils::analyse_vertex_program
 		(

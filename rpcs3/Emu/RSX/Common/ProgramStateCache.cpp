@@ -31,7 +31,6 @@ size_t vertex_program_utils::get_vertex_program_ucode_hash(const RSXVertexProgra
 vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vertex_program(const u32* data, u32 entry, RSXVertexProgram& dst_prog)
 {
 	vertex_program_utils::vertex_program_metadata result;
-	u32 current_instrution = entry;
 	u32 last_instruction_address = 0;
 	u32 first_instruction_address = entry;
 
@@ -45,32 +44,45 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 	D1  d1;
 	D0  d0;
 
-	while (true)
+	std::function<void(u32, bool)> walk_function = [&](u32 start, bool fast_exit)
 	{
-		verify(HERE), current_instrution < 512;
+		u32 current_instrution = start;
+		std::set<u32> conditional_targets;
 
-		if (result.instruction_mask[current_instrution])
+		while (true)
 		{
-			// This can be harmless if a dangling RET was encountered before
-			LOG_ERROR(RSX, "vp_analyser: Possible infinite loop detected");
-			current_instrution++;
-			continue;
-		}
+			verify(HERE), current_instrution < 512;
 
-		const qword* instruction = (const qword*)&data[current_instrution * 4];
-		d1.HEX = instruction->word[1];
-		d3.HEX = instruction->word[3];
+			if (result.instruction_mask[current_instrution])
+			{
+				if (!fast_exit)
+				{
+					// This can be harmless if a dangling RET was encountered before
+					LOG_ERROR(RSX, "vp_analyser: Possible infinite loop detected");
+					current_instrution++;
+					continue;
+				}
+				else
+				{
+					// Block walk, looking for earliest exit
+					return;
+				}
+			}
 
-		// Touch current instruction
-		result.instruction_mask[current_instrution] = 1;
-		instruction_range.first = std::min(current_instrution, instruction_range.first);
-		instruction_range.second = std::max(current_instrution, instruction_range.second);
+			const qword* instruction = (const qword*)&data[current_instrution * 4];
+			d1.HEX = instruction->word[1];
+			d3.HEX = instruction->word[3];
 
-		bool static_jump = false;
-		bool function_call = true;
+			// Touch current instruction
+			result.instruction_mask[current_instrution] = 1;
+			instruction_range.first = std::min(current_instrution, instruction_range.first);
+			instruction_range.second = std::max(current_instrution, instruction_range.second);
 
-		switch (d1.sca_opcode)
-		{
+			bool static_jump = false;
+			bool function_call = true;
+
+			switch (d1.sca_opcode)
+			{
 			case RSX_SCA_OPCODE_BRI:
 			{
 				d0.HEX = instruction->word[0];
@@ -101,12 +113,14 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 				}
 				else if (static_jump)
 				{
+					// NOTE: This will skip potential jump target blocks between current->target
 					current_instrution = jump_address;
 					continue;
 				}
 				else
 				{
 					// Set possible end address and proceed as usual
+					conditional_targets.emplace(jump_address);
 					instruction_range.second = std::max(jump_address, instruction_range.second);
 				}
 
@@ -127,16 +141,27 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 
 				break;
 			}
+			}
+
+			if (d3.end && (fast_exit || current_instrution >= instruction_range.second) ||
+				(current_instrution + 1) == 512)
+			{
+				break;
+			}
+
+			current_instrution++;
 		}
 
-		if ((d3.end && current_instrution >= instruction_range.second) ||
-			(current_instrution + 1) == 512)
+		for (const u32 target : conditional_targets)
 		{
-			break;
+			if (!result.instruction_mask[target])
+			{
+				walk_function(target, true);
+			}
 		}
+	};
 
-		current_instrution++;
-	}
+	walk_function(entry, false);
 
 	const u32 instruction_count = (instruction_range.second - instruction_range.first + 1);
 	result.ucode_length = instruction_count * 16;
