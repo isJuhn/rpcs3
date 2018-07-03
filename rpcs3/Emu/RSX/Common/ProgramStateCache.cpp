@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ProgramStateCache.h"
+#include "Emu/System.h"
 
 #include <stack>
 
@@ -160,6 +161,11 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 			}
 		}
 	};
+
+	if (g_cfg.video.log_programs)
+	{
+		fs::file(fs::get_config_dir() + "shaderlog/vp_analyser.bin", fs::rewrite).write(data, 512 * 4);
+	}
 
 	walk_function(entry, false);
 
