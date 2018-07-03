@@ -40,7 +40,7 @@ namespace rsx
 
 	u32 get_address(u32 offset, u32 location)
 	{
-
+		offset &= 0xFFFFFFF;
 		switch (location)
 		{
 		case CELL_GCM_CONTEXT_DMA_MEMORY_FRAME_BUFFER:
