@@ -415,21 +415,28 @@ VertexProgramDecompiler::VertexProgramDecompiler(const RSXVertexProgram& prog) :
 
 std::string VertexProgramDecompiler::Decompile()
 {
-	for (unsigned i = 0; i < PF_PARAM_COUNT; i++)
-		m_parr.params[i].clear();
-
 	const auto& data = m_prog.data;
 	m_instr_count = data.size() / 4;
+
+	bool is_has_BRA = false;
+	bool program_end = false;
+	u32 i = 1;
+	u32 last_label_addr = 0;
+
+	for (unsigned i = 0; i < PF_PARAM_COUNT; i++)
+	{
+		m_parr.params[i].clear();
+	}
 
 	for (int i = 0; i < m_max_instr_count; ++i)
 	{
 		m_instructions[i].reset();
 	}
 
-	bool is_has_BRA = false;
-	bool program_end = false;
-	u32 i = 1;
-	u32 last_label_addr = 0;
+	if (m_prog.jump_table.size())
+	{
+		last_label_addr = *m_prog.jump_table.rbegin();
+	}
 
 	auto find_jump_lvl = [this](u32 address)
 	{
@@ -456,27 +463,6 @@ std::string VertexProgramDecompiler::Decompile()
 		m_cur_instr->open_scopes++;
 		i = GetAddr();
 	};
-
-	if (is_has_BRA || !m_prog.jump_table.empty())
-	{
-		m_cur_instr = &m_instructions[0];
-
-		u32 jump_position = 0;
-		if (m_prog.entry != m_prog.base_address)
-		{
-			jump_position = find_jump_lvl(m_prog.entry - m_prog.base_address);
-			verify(HERE), jump_position != UINT32_MAX;
-		}
-
-		AddCode(fmt::format("int jump_position = %u;", jump_position));
-		AddCode("while (true)");
-		AddCode("{");
-		m_cur_instr->open_scopes++;
-
-		AddCode("if (jump_position <= 0)");
-		AddCode("{");
-		m_cur_instr->open_scopes++;
-	}
 
 	auto do_function_return = [this, &i]()
 	{
@@ -514,6 +500,27 @@ std::string VertexProgramDecompiler::Decompile()
 		}
 	};
 
+	if (is_has_BRA || !m_prog.jump_table.empty())
+	{
+		m_cur_instr = &m_instructions[0];
+
+		u32 jump_position = 0;
+		if (m_prog.entry != m_prog.base_address)
+		{
+			jump_position = find_jump_lvl(m_prog.entry - m_prog.base_address);
+			verify(HERE), jump_position != UINT32_MAX;
+		}
+
+		AddCode(fmt::format("int jump_position = %u;", jump_position));
+		AddCode("while (true)");
+		AddCode("{");
+		m_cur_instr->open_scopes++;
+
+		AddCode("if (jump_position <= 0)");
+		AddCode("{");
+		m_cur_instr->open_scopes++;
+	}
+
 	for (i = 0; i < m_instr_count; ++i)
 	{
 		if (!m_prog.instruction_mask[i])
@@ -535,12 +542,6 @@ std::string VertexProgramDecompiler::Decompile()
 		src[2].src2l = d3.src2l;
 		src[2].src2h = d2.src2h;
 
-		if (!src[0].reg_type || !src[1].reg_type || !src[2].reg_type)
-		{
-			AddCode("//Src check failed. Aborting");
-			program_end = true;
-		}
-
 		if (m_call_stack.empty() && i)
 		{
 			//TODO: Subroutines can also have arbitrary jumps!
@@ -555,6 +556,13 @@ std::string VertexProgramDecompiler::Decompile()
 				AddCode("{");
 				m_cur_instr->open_scopes++;
 			}
+		}
+
+		if (!src[0].reg_type || !src[1].reg_type || !src[2].reg_type)
+		{
+			AddCode("//Src check failed. Aborting");
+			program_end = true;
+			d1.vec_opcode = d1.sca_opcode = 0;
 		}
 
 		switch (d1.vec_opcode)
@@ -720,7 +728,7 @@ std::string VertexProgramDecompiler::Decompile()
 				if ((i + 1) < m_instr_count)
 				{
 					// In rare cases, this might be harmless (large coalesced program blocks controlled via branches aka ubershaders)
-					LOG_ERROR(RSX, "Vertex program aborted prematurely. Expect glitches");
+					LOG_ERROR(RSX, "Vertex program block aborts prematurely. Expect glitches");
 				}
 
 				break;

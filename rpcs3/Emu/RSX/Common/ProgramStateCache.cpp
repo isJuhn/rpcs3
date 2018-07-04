@@ -66,7 +66,7 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 				else
 				{
 					// Block walk, looking for earliest exit
-					return;
+					break;
 				}
 			}
 
@@ -217,6 +217,15 @@ vertex_program_utils::vertex_program_metadata vertex_program_utils::analyse_vert
 			{
 				dst->dword[0] = 0ull;
 				dst->dword[1] = 0ull;
+			}
+		}
+
+		// Verification
+		for (const u32 target : dst_prog.jump_table)
+		{
+			if (!result.instruction_mask[target])
+			{
+				LOG_ERROR(RSX, "vp_analyser: Failed, branch target 0x%x was not resolved", target);
 			}
 		}
 	}
