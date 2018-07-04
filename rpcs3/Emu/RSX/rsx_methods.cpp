@@ -540,7 +540,7 @@ namespace rsx
 			rsx->sync();
 		}
 
-		void invalidate_L2(thread* rsx, u32, u32)
+		void set_shader_program_dirty(thread* rsx, u32, u32)
 		{
 			rsx->m_graphics_state |= rsx::pipeline_state::fragment_program_dirty;
 		}
@@ -1784,7 +1784,8 @@ namespace rsx
 		bind<NV4097_WAIT_FOR_IDLE, nv4097::sync>();
 		bind<NV4097_ZCULL_SYNC, nv4097::sync>();
 		bind<NV4097_SET_CONTEXT_DMA_REPORT, nv4097::sync>();
-		bind<NV4097_INVALIDATE_L2, nv4097::invalidate_L2>();
+		bind<NV4097_INVALIDATE_L2, nv4097::set_shader_program_dirty>();
+		bind<NV4097_SET_SHADER_PROGRAM, nv4097::set_shader_program_dirty>();
 		bind<NV4097_SET_TRANSFORM_PROGRAM_START, nv4097::set_transform_program_start>();
 		bind<NV4097_SET_VERTEX_ATTRIB_OUTPUT_MASK, nv4097::set_vertex_attribute_output_mask>();
 
