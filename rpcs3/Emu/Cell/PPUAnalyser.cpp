@@ -833,7 +833,9 @@ void ppu_module::analyse(u32 lib_toc, u32 entry)
 		}
 	}
 
-	if (*(u64*)sha1 == 0x1500ff59532c3109 && *(u64*)(sha1 + 8) == 0x9cb487d817fcd26 && *(u32*)(sha1 + 16) == 0x15f5bb61)
+	LOG_ERROR(PPU, "sha1=0x%x, 0x%x, 0x%x", *(u64*)sha1, *(u64*)(sha1 + 8), *(u32*)(sha1 + 16));
+
+	if (*(u64*)sha1 == 0x1500ff59532c3109 && *(u64*)(sha1 + 8) == 0x9cb487d817fcd26 && *(u32*)(sha1 + 16) == 0x15f5bb61) //jak1
 	{
 		add_func(0x80d5c, lib_toc, 0);
 		add_func(0x80e9c, lib_toc, 0);
@@ -894,45 +896,123 @@ void ppu_module::analyse(u32 lib_toc, u32 entry)
 		add_func(0x2EAB50, lib_toc, 0);
 		add_func(0x2EACE0, lib_toc, 0);
 		add_func(0x2EAEF4, lib_toc, 0);
-	/*	add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);
-		add_func(0x, lib_toc, 0);*/
-		//u32 n_funcs = *(be_t<u32>*)vm::base(0x75C090);
-		//LOG_ERROR(PPU, "n_funcs=0x%x", n_funcs);
 		for (vm::cptr<u32> ptr = vm::cast((u32)0x75C094); ptr.addr() < vm::cast((u32)0x75D028); ptr += 2)
 		{
 			be_t<u32>* baseptr = (be_t<u32>*)vm::base(*ptr);
 			u32 n_funcs = *baseptr;
-			//LOG_ERROR(PPU, "n_funcs=0x%x", n_funcs);
 			for (int i = 0; i < n_funcs; i++)
 			{
-			//	LOG_ERROR(PPU, "addr=0x%x, func=0x%x", baseptr + 1 + 4 * i, *(baseptr + 1 + 4 * i));
+				add_func(*(baseptr + 1 + 4 * i), lib_toc, 0);
+			}
+		}
+	}
+	else if (*(u64*)sha1 == 0x1e913b370c6f239a && *(u64*)(sha1 + 8) == 0x27c14b401c3f9df9 && *(u32*)(sha1 + 16) == 0x745fb33) //jak2
+	{
+		add_func(0x8f658, lib_toc, 0);
+		add_func(0x8F694, lib_toc, 0);
+		add_func(0x8F710, lib_toc, 0);
+		add_func(0x8F798, lib_toc, 0);
+		add_func(0x5668dc, lib_toc, 0);
+		add_func(0x5666D0, lib_toc, 0);
+		add_func(0x566470, lib_toc, 0);
+		add_func(0x566298, lib_toc, 0);
+		add_func(0x566A18, lib_toc, 0);
+		add_func(0x566B44, lib_toc, 0);
+		add_func(0x566C24, lib_toc, 0);
+		add_func(0x566E28, lib_toc, 0);
+		add_func(0x566FB8, lib_toc, 0);
+		add_func(0x5670F4, lib_toc, 0);
+		add_func(0x5671CC, lib_toc, 0);
+		add_func(0x564F18, lib_toc, 0);
+		add_func(0x565054, lib_toc, 0);
+		add_func(0x565258, lib_toc, 0);
+		add_func(0x5653E8, lib_toc, 0);
+		add_func(0x5654C8, lib_toc, 0);
+		add_func(0x565670, lib_toc, 0);
+		add_func(0x56579C, lib_toc, 0);
+		add_func(0x5659A8, lib_toc, 0);
+		add_func(0x565C7C, lib_toc, 0);
+		add_func(0x564EBC, lib_toc, 0);
+		add_func(0x564DE4, lib_toc, 0);
+		add_func(0x5646B8, lib_toc, 0);
+		add_func(0x564200, lib_toc, 0);
+		add_func(0x563EC4, lib_toc, 0);
+		add_func(0x563CAC, lib_toc, 0);
+		add_func(0x56399C, lib_toc, 0);
+		add_func(0x563808, lib_toc, 0);
+		add_func(0x5635BC, lib_toc, 0);
+		add_func(0x563288, lib_toc, 0);
+		add_func(0x5630D4, lib_toc, 0);
+		add_func(0x563040, lib_toc, 0);
+		add_func(0x562EB4, lib_toc, 0);
+		add_func(0x90DE8, lib_toc, 0);
+		add_func(0x90FC8, lib_toc, 0);
+		add_func(0x912DC, lib_toc, 0);
+		add_func(0x91614, lib_toc, 0);
+		add_func(0x91A94, lib_toc, 0);
+		add_func(0x91C44, lib_toc, 0);
+		for (vm::cptr<u32> ptr = vm::cast((u32)0xC64C84); ptr.addr() < vm::cast((u32)0xC665D0); ptr += 2)
+		{
+			be_t<u32>* baseptr = (be_t<u32>*)vm::base(*ptr);
+			u32 n_funcs = *baseptr;
+			for (int i = 0; i < n_funcs; i++)
+			{
+				add_func(*(baseptr + 1 + 4 * i), lib_toc, 0);
+			}
+		}
+	}
+	else if (*(u64*)sha1 == 0x8b8f95c13903ae6d && *(u64*)(sha1 + 8) == 0x61db290d78a05831 && *(u32*)(sha1 + 16) == 0x6f8b6f9a) //jak3
+	{
+		add_func(0x8FB78, lib_toc, 0);
+		add_func(0x8FC30, lib_toc, 0);
+		add_func(0x8FCB8, lib_toc, 0);
+		add_func(0x8FCB4, lib_toc, 0);
+		add_func(0x8FBB4, lib_toc, 0);
+		add_func(0x7161B4, lib_toc, 0);
+		add_func(0x715F54, lib_toc, 0);
+		add_func(0x715C80, lib_toc, 0);
+		add_func(0x715664, lib_toc, 0);
+		add_func(0x715390, lib_toc, 0);
+		add_func(0x715184, lib_toc, 0);
+		add_func(0x715058, lib_toc, 0);
+		add_func(0x714EB0, lib_toc, 0);
+		add_func(0x714DD0, lib_toc, 0);
+		add_func(0x714C40, lib_toc, 0);
+		add_func(0x714A3C, lib_toc, 0);
+		add_func(0x714900, lib_toc, 0);
+		add_func(0x7148A4, lib_toc, 0);
+		add_func(0x7147CC, lib_toc, 0);
+		add_func(0x7140A0, lib_toc, 0);
+		add_func(0x713BE8, lib_toc, 0);
+		add_func(0x7138AC, lib_toc, 0);
+		add_func(0x713694, lib_toc, 0);
+		add_func(0x713384, lib_toc, 0);
+		add_func(0x7131F0, lib_toc, 0);
+		add_func(0x712FA4, lib_toc, 0);
+		add_func(0x712C70, lib_toc, 0);
+		add_func(0x712ABC, lib_toc, 0);
+		add_func(0x712A28, lib_toc, 0);
+		add_func(0x71289C, lib_toc, 0);
+		add_func(0x7163C0, lib_toc, 0);
+		add_func(0x716568, lib_toc, 0);
+		add_func(0x716694, lib_toc, 0);
+		add_func(0x716774, lib_toc, 0);
+		add_func(0x716978, lib_toc, 0);
+		add_func(0x716B08, lib_toc, 0);
+		add_func(0x716C44, lib_toc, 0);
+		add_func(0x716D1C, lib_toc, 0);
+		add_func(0x9140C, lib_toc, 0);
+		add_func(0x915EC, lib_toc, 0);
+		add_func(0x91900, lib_toc, 0);
+		add_func(0x91C38, lib_toc, 0);
+		add_func(0x920B8, lib_toc, 0);
+		add_func(0x92268, lib_toc, 0);
+		for (vm::cptr<u32> ptr = vm::cast((u32)0x1029624); ptr.addr() < vm::cast((u32)0x102B5A0); ptr += 2)
+		{
+			be_t<u32>* baseptr = (be_t<u32>*)vm::base(*ptr);
+			u32 n_funcs = *baseptr;
+			for (int i = 0; i < n_funcs; i++)
+			{
 				add_func(*(baseptr + 1 + 4 * i), lib_toc, 0);
 			}
 		}
