@@ -1,27 +1,106 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "Emu/System.h"
 #include "Emu/Cell/PPUModule.h"
 
+#include "Emu/IdManager.h"
+#include "Emu/Cell/lv2/sys_event.h"
 #include "cellVoice.h"
+#include <thread>
 
 LOG_CHANNEL(cellVoice);
 
-
-s32 cellVoiceConnectIPortToOPort()
+template <>
+void fmt_class_string<CellVoiceError>::format(std::string& out, u64 arg)
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	format_enum(out, arg, [](CellVoiceError value)
+	{
+		switch (value)
+		{
+			STR_CASE(CELL_VOICE_ERROR_ADDRESS_INVALID);
+			STR_CASE(CELL_VOICE_ERROR_ARGUMENT_INVALID);
+			STR_CASE(CELL_VOICE_ERROR_CONTAINER_INVALID);
+			STR_CASE(CELL_VOICE_ERROR_DEVICE_NOT_PRESENT);
+			STR_CASE(CELL_VOICE_ERROR_EVENT_DISPATCH);
+			STR_CASE(CELL_VOICE_ERROR_EVENT_QUEUE);
+			STR_CASE(CELL_VOICE_ERROR_GENERAL);
+			STR_CASE(CELL_VOICE_ERROR_LIBVOICE_INITIALIZED);
+			STR_CASE(CELL_VOICE_ERROR_LIBVOICE_NOT_INIT);
+			STR_CASE(CELL_VOICE_ERROR_RESOURCE_INSUFFICIENT);
+			STR_CASE(CELL_VOICE_ERROR_SERVICE_ATTACHED);
+			STR_CASE(CELL_VOICE_ERROR_SERVICE_DETACHED);
+			STR_CASE(CELL_VOICE_ERROR_SERVICE_HANDLE);
+			STR_CASE(CELL_VOICE_ERROR_SERVICE_NOT_FOUND);
+			STR_CASE(CELL_VOICE_ERROR_SHAREDMEMORY);
+			STR_CASE(CELL_VOICE_ERROR_TOPOLOGY);
+		}
+
+		return unknown;
+	});
+}
+
+void voice_thread::on_init(const std::shared_ptr<void>& _this)
+{
+	named_thread::on_init(_this);
+}
+
+void voice_thread::on_task()
+{
+	std::this_thread::sleep_for(1s);
+}
+
+s32 cellVoiceConnectIPortToOPort(u32 iPort, u32 oPort)
+{
+	cellVoice.todo("cellVoiceConnectIPortToOPort(iPort=0x%x, oPort=0x%x)", iPort, oPort);
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
 	return CELL_OK;
 }
 
-s32 cellVoiceCreateNotifyEventQueue()
+error_code cellVoiceCreateNotifyEventQueue(vm::ptr<u32> id, vm::ptr<u64> key)
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
-	return CELL_OK;
+	cellVoice.todo("cellVoiceCreateNotifyEventQueue(id=*0x%x, key=*0x%x)", id, key);
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
+	vm::var<sys_event_queue_attribute_t> attr;
+	attr->protocol = SYS_SYNC_FIFO;
+	attr->type = SYS_PPU_QUEUE;
+	attr->name_u64 = 0;
+
+	for (u64 i = 0; i < 100; i++)
+	{
+		// Create an event queue "bruteforcing" an available key
+		const u64 key_value = 0x80004d494f323221ull + i;
+
+		if (const s32 res = sys_event_queue_create(id, attr, key_value, 32))
+		{
+			if (res != CELL_EEXIST)
+			{
+				return res;
+			}
+		}
+		else
+		{
+			*key = key_value;
+			return CELL_OK;
+		}
+	}
+
+	return CELL_VOICE_ERROR_EVENT_QUEUE;
 }
 
-s32 cellVoiceCreatePort()
+error_code cellVoiceCreatePort(vm::ptr<u32> portId, vm::cptr<CellVoicePortParam> pArg)
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceCreatePort(portId=*0x%x, pArg=*0x%x)", portId, pArg);
 	return CELL_OK;
 }
 
@@ -37,9 +116,17 @@ s32 cellVoiceDisconnectIPortFromOPort()
 	return CELL_OK;
 }
 
-s32 cellVoiceEnd()
+error_code cellVoiceEnd()
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceEnd()");
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
+	return CELL_OK;
 	return CELL_OK;
 }
 
@@ -79,9 +166,17 @@ s32 cellVoiceGetVolume()
 	return CELL_OK;
 }
 
-s32 cellVoiceInit()
+error_code cellVoiceInit(vm::ptr<CellVoiceInitParam> pArg)
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceInit(pArg=*0x%x)", pArg);
+
+	const auto voiceThread = fxm::make<voice_thread>();
+	voiceInited = true;
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_INITIALIZED;
+	}
+
 	return CELL_OK;
 }
 
@@ -127,9 +222,16 @@ s32 cellVoiceResumePortAll()
 	return CELL_OK;
 }
 
-s32 cellVoiceSetBitRate()
+error_code cellVoiceSetBitRate(u32 portId, s32 bitrate)
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceSetBitRate(portId=0x%x, bitrate=%d)", portId, bitrate);
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
 	return CELL_OK;
 }
 
@@ -145,9 +247,18 @@ s32 cellVoiceSetMuteFlagAll()
 	return CELL_OK;
 }
 
-s32 cellVoiceSetNotifyEventQueue()
+error_code cellVoiceSetNotifyEventQueue(u64 key)
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceSetNotifyEventQueue(key=0x%llx)", key);
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
+	voiceThread->eventQueueKey = key;
+
 	return CELL_OK;
 }
 
@@ -163,9 +274,19 @@ s32 cellVoiceSetVolume()
 	return CELL_OK;
 }
 
-s32 cellVoiceStart()
+error_code cellVoiceStart()
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceStart()");
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
+	auto voiceQueue = lv2_event_queue::find(voiceThread->eventQueueKey);
+	voiceQueue->send(0, CELLVOICE_EVENT_SERVICE_ATTACHED, 0, 0);
+
 	return CELL_OK;
 }
 
@@ -175,9 +296,16 @@ s32 cellVoiceStartEx()
 	return CELL_OK;
 }
 
-s32 cellVoiceStop()
+error_code cellVoiceStop()
 {
-	UNIMPLEMENTED_FUNC(cellVoice);
+	cellVoice.todo("cellVoiceStop()");
+
+	const auto voiceThread = fxm::get<voice_thread>();
+	if (!voiceThread)
+	{
+		return CELL_VOICE_ERROR_LIBVOICE_NOT_INIT;
+	}
+
 	return CELL_OK;
 }
 

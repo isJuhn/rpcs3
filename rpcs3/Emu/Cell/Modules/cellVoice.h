@@ -1,12 +1,12 @@
-#pragma once
+﻿#pragma once
 
-
+#include "Utilities/Thread.h"
 
 // libvoice = 0x80310801 - 0x803108ff
 // libvoice version 100
 
 // Error Codes
-enum
+enum CellVoiceError : u32
 {
 	CELL_VOICE_ERROR_ADDRESS_INVALID       = 0x8031080a,
 	CELL_VOICE_ERROR_ARGUMENT_INVALID      = 0x80310805,
@@ -87,5 +87,73 @@ enum
 	CELLVOICE_ATTR_LATENCY = 1004,
 	CELLVOICE_ATTR_SILENCE_THRESHOLD = 1005,
 
-	CELLVOICE_APPTYPE_GAME_1MB = 1 << 29
+	CELLVOICE_APPTYPE_GAME_1MB = 1 << 29,
+
+	CELLVOICE_VERSION_100 = 100
+};
+
+struct CellVoiceBasePortInfo
+{
+	be_t<s32> portType;
+	be_t<s32> state;
+	be_t<u16> numEdge;
+	vm::bptr<u32> pEdge;
+	be_t<u32> numBytes;
+	be_t<u32> frameSize;
+};
+
+struct CellVoiceInitParam
+{
+	be_t<s32> eventMask;
+	be_t<s32> version;
+	be_t<s32> appType;
+	u8 reserved[20];
+};
+
+struct CellVoicePCMFormat
+{
+	u8 numChannels;
+	u8 sampleAlignment;
+	be_t<s32> dataType;
+	be_t<s32> sampleRate;
+};
+
+struct CellVoicePortParam
+{
+	be_t<s32> portType;
+	be_t<u16> threshold;
+	be_t<u16> bMute;
+	be_t<float> volume;
+	union {
+		struct voice
+		{
+			be_t<s32> bitrate;
+		};
+		struct pcmaudio
+		{
+			be_t<u32> bufSize;
+			CellVoicePCMFormat format;
+		};
+		struct device
+		{
+			be_t<u32> playerId;
+		};
+	};
+};
+
+bool voiceInited = false;
+
+class voice_thread final : public named_thread
+{
+private:
+	void on_task() override;
+	std::string get_name() const override { return "Voice Thread"; }
+public:
+	void on_init(const std::shared_ptr<void>&) override;
+	u64 eventQueueKey = 0;
+	voice_thread() = default;
+	~voice_thread()
+	{
+		voiceInited = false;
+	}
 };
