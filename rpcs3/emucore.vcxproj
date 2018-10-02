@@ -338,6 +338,7 @@
     <ClCompile Include="Loader\TAR.cpp" />
     <ClCompile Include="Loader\TROPUSR.cpp" />
     <ClCompile Include="Loader\TRP.cpp" />
+    <ClCompile Include="patchModule.cpp" />
     <ClCompile Include="rpcs3_version.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -575,6 +576,7 @@
     <ClInclude Include="Loader\TAR.h" />
     <ClInclude Include="Loader\TROPUSR.h" />
     <ClInclude Include="Loader\TRP.h" />
+    <ClInclude Include="patchModule.h" />
     <ClInclude Include="restore_new.h" />
     <ClInclude Include="rpcs3_version.h" />
     <ClInclude Include="stdafx.h" />

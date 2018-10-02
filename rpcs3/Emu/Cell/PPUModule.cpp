@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "Utilities/VirtualMemory.h"
 #include "Utilities/bin_patch.h"
 #include "Crypto/sha1.h"
@@ -254,6 +254,7 @@ static void ppu_initialize_modules(const std::shared_ptr<ppu_linkage_info>& link
 		&ppu_module_manager::sysPrxForUser,
 		&ppu_module_manager::sys_libc,
 		&ppu_module_manager::sys_lv2dbg,
+		&ppu_module_manager::patchModule,
 	};
 
 	// Initialize double-purpose fake OPD array for HLE functions
@@ -1117,6 +1118,9 @@ void ppu_load_exec(const ppu_exec_object& elf)
 		hash[5 + i * 2] = pal[_main->sha1[i] & 15];
 	}
 
+	// Initialize HLE modules
+	ppu_initialize_modules(link);
+
 	// Apply the patch
 	auto applied = fxm::check_unlocked<patch_engine>()->apply(hash, vm::g_base_addr);
 
@@ -1127,9 +1131,6 @@ void ppu_load_exec(const ppu_exec_object& elf)
 	}
 
 	LOG_NOTICE(LOADER, "PPU executable hash: %s (<- %u)", hash, applied);
-
-	// Initialize HLE modules
-	ppu_initialize_modules(link);
 
 	// Load other programs
 	for (auto& prog : elf.progs)

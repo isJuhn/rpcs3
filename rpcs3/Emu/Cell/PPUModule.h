@@ -265,6 +265,7 @@ public:
 	static const ppu_static_module sysPrxForUser;
 	static const ppu_static_module sys_libc;
 	static const ppu_static_module sys_lv2dbg;
+	static const ppu_static_module patchModule;
 };
 
 template<typename T, T Func>
