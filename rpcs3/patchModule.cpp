@@ -32,13 +32,22 @@ vm::ptr<void> do_stuff(ppu_thread& ppu, vm::ptr<void> spawner, vm::ptr<Vec4> arg
 void do_stuff_l(ppu_thread& ppu, u32 moby, u32 anim_data_size)
 {
 	patchModule.todo("create_moby(mobyID=0x%x, anim_data_size=0x%x)", moby, anim_data_size);
+	if (moby == 0xa82)
+	{
+		ppu.gpr[3] = 0x1867;
+		ppu.gpr[4] = 0x300;
+	}
 	FUNCL_RETURN;
 }
 
-
+void do_nothing(ppu_thread& ppu)
+{
+	patchModule.todo("do_nothing called from 0x%x", ppu.cia - 0x10);
+}
 
 DECLARE(ppu_module_manager::patchModule)("patchModule", []()
 {
 	REG_FUNC(patchModule, do_stuff);
 	REG_FUNC(patchModule, do_stuff_l);
+	REG_FUNC(patchModule, do_nothing);
 });

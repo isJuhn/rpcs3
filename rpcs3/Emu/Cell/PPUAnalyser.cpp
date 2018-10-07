@@ -1,11 +1,13 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "PPUOpcodes.h"
 #include "PPUModule.h"
 #include "PPUAnalyser.h"
+#include "../IdManager.h"
 
 #include <unordered_set>
 #include "yaml-cpp/yaml.h"
 #include "Utilities/asm.h"
+#include "Utilities/bin_patch.h"
 
 const ppu_decoder<ppu_itype> s_ppu_itype;
 
@@ -831,6 +833,11 @@ void ppu_module::analyse(u32 lib_toc, u32 entry)
 				//known_functions.emplace(func);
 			}
 		}
+	}
+
+	for (auto pair : fxm::get<patch_engine>()->get_HLE_rets())
+	{
+		add_func(pair.second, lib_toc, 0);
 	}
 
 	// Main loop (func_queue may grow)
