@@ -3,6 +3,9 @@
 #include "File.h"
 #include "Config.h"
 #include "./Emu/Cell/PPUModule.h"
+#include "types.h"
+
+extern void ppu_register_range(u32 addr, u32 size);
 
 template <>
 void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
@@ -24,6 +27,7 @@ void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
 		case patch_type::lef32: return "lef32";
 		case patch_type::lef64: return "lef64";
 		case patch_type::func: return "func";
+		case patch_type::funcl: return "funcl";
 		}
 
 		return unknown;
@@ -98,6 +102,7 @@ void patch_engine::append(const std::string& patch)
 					break;
 				}
 				case patch_type::func:
+				case patch_type::funcl:
 				{
 					const auto& str = patch[2].Scalar();
 					info.str.resize(str.size());
@@ -117,7 +122,7 @@ void patch_engine::append(const std::string& patch)
 	}
 }
 
-std::size_t patch_engine::apply(const std::string& name, u8* dst) const
+std::size_t patch_engine::apply(const std::string& name, u8* dst)
 {
 	const auto found = m_map.find(name);
 
@@ -125,6 +130,12 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 	{
 		return 0;
 	}
+
+	u32 funcl_count = std::count_if(found->second.cbegin(), found->second.cend(), [](auto p) { return p.type == patch_type::funcl; });
+
+	u32 cleanup_code_addr = vm::alloc(funcl_count * 0x4 * 13, vm::main);
+
+	ppu_register_range(cleanup_code_addr, funcl_count * 0x4 * 13);
 
 	// Apply modifications sequentially
 	for (const auto& p : found->second)
@@ -178,13 +189,12 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 			break;
 		}
 		case patch_type::func:
+		case patch_type::funcl:
 		{
-			//LOG_ERROR(PPU, "patch func, offset=0x%x, type=0x%x, value=0x%x, value=%s", p.offset, p.type, p.value, p.str);
 			u32 addr{};
 			const auto& funcs = ppu_module_manager::patchModule.functions;
 			for (const auto& func : funcs)
 			{
-				//LOG_ERROR(PPU, "func.first=0x%x, func.second.name=%s, func.second.export_addr=0x%x", func.first, func.second.name, func.second.export_addr);
 				if (p.str.compare(func.second.name) == 0)
 				{
 					addr = *func.second.export_addr;
@@ -196,11 +206,39 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 				LOG_ERROR(PPU, "Failed to patch function at 0x%x with HLE function %s", p.offset, p.str);
 				break;
 			}
-			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ 0x3C000000 | (addr >> 16) };
-			*reinterpret_cast<be_t<u32, 1>*>(ptr + 4) = u32{ 0x60000000 | (addr & 0xFFFF) };
-			*reinterpret_cast<be_t<u32, 1>*>(ptr + 8) = u32{ 0x7C0903A6 };
-			*reinterpret_cast<be_t<u32, 1>*>(ptr + 12) = u32{ 0x4E800420 };
-			*reinterpret_cast<be_t<u32, 1>*>(ptr + 16) = u32{ 0x60000000 };
+
+			if (p.type == patch_type::funcl)
+			{
+				cleanup_code_map[(u32)ptr] = cleanup_code_addr;
+
+				vm::write32(cleanup_code_addr, 0xE8010000); // ld r0, 0x0(r1)
+				vm::write32(cleanup_code_addr + 0x4, 0x7C0803A6); // mtlr r0
+				vm::write32(cleanup_code_addr + 0x8, 0xE8010008); // ld r0, 0x8(r1)
+				vm::write32(cleanup_code_addr + 0xC, 0x38210010); // addi r1, r1, 0x10
+				vm::write32(cleanup_code_addr + 0x10, *reinterpret_cast<be_t<u32>*>(ptr));
+				vm::write32(cleanup_code_addr + 0x14, *reinterpret_cast<be_t<u32>*>(ptr + 0x4));
+				vm::write32(cleanup_code_addr + 0x18, *reinterpret_cast<be_t<u32>*>(ptr + 0x8));
+				vm::write32(cleanup_code_addr + 0x1C, *reinterpret_cast<be_t<u32>*>(ptr + 0xC));
+				vm::write32(cleanup_code_addr + 0x20, *reinterpret_cast<be_t<u32>*>(ptr + 0x10));
+				vm::write32(cleanup_code_addr + 0x24, *reinterpret_cast<be_t<u32>*>(ptr + 0x14));
+				vm::write32(cleanup_code_addr + 0x28, *reinterpret_cast<be_t<u32>*>(ptr + 0x18));
+				vm::write32(cleanup_code_addr + 0x2C, *reinterpret_cast<be_t<u32>*>(ptr + 0x1C));
+				vm::write32(cleanup_code_addr + 0x30, 0x4E800420); // bcctr 20, 0, 0
+
+				cleanup_code_addr += 0x34;
+
+				*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ 0xF821FFF1 }; // stdu r1, -0x10(r1)
+				*reinterpret_cast<be_t<u32, 1>*>(ptr + 0x4) = u32{ 0xF8010008 }; // std r0, 0x8(r1)
+				*reinterpret_cast<be_t<u32, 1>*>(ptr + 0x8) = u32{ 0x7C0802A6 }; // mflr r0
+				*reinterpret_cast<be_t<u32, 1>*>(ptr + 0xC) = u32{ 0xF8010000 }; // std r0, 0x0(r1)
+
+				ptr += 0x10;
+			}
+
+			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ 0x3C000000 | (addr >> 16) }; // lis r0, addr_h
+			*reinterpret_cast<be_t<u32, 1>*>(ptr + 0x4) = u32{ 0x60000000 | (addr & 0xFFFF) }; // ori r0, addr_l(r0)
+			*reinterpret_cast<be_t<u32, 1>*>(ptr + 0x8) = u32{ 0x7C0903A6 }; // mtctr r0
+			*reinterpret_cast<be_t<u32, 1>*>(ptr + 0xC) = p.type == patch_type::func ? u32{ 0x4E800420 } : u32{ 0x4E800421 }; //bcctr(l) 20, 0, 0
 			LOG_NOTICE(LOADER, "Patched function at 0x%x with HLE function %s", p.offset, p.str);
 			break;
 		}
@@ -208,4 +246,9 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 	}
 
 	return found->second.size();
+}
+
+std::unordered_map<u32, u32>& patch_engine::get_HLE_rets()
+{
+	return cleanup_code_map;
 }

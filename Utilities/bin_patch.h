@@ -20,6 +20,7 @@ enum class patch_type
 	bef32,
 	bef64,
 	func,
+	funcl,
 };
 
 class patch_engine
@@ -47,10 +48,15 @@ class patch_engine
 	// Database
 	std::unordered_map<std::string, std::vector<patch>> m_map;
 
+	// Patched addr -> cleanup code cave addr
+	std::unordered_map<u32, u32> cleanup_code_map;
+
 public:
 	// Load from file
 	void append(const std::string& path);
 
 	// Apply patch (returns the number of entries applied)
-	std::size_t apply(const std::string& name, u8* dst) const;
+	std::size_t apply(const std::string& name, u8* dst);
+
+	std::unordered_map<u32, u32>& get_HLE_rets();
 };
