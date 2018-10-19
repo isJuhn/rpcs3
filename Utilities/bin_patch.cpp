@@ -132,10 +132,13 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst)
 	}
 
 	u32 funcl_count = std::count_if(found->second.cbegin(), found->second.cend(), [](auto p) { return p.type == patch_type::funcl; });
+	u32 cleanup_code_addr;
 
-	u32 cleanup_code_addr = vm::alloc(funcl_count * 0x4 * 13, vm::main);
-
-	ppu_register_range(cleanup_code_addr, funcl_count * 0x4 * 13);
+	if (funcl_count)
+	{
+		cleanup_code_addr = vm::alloc(::align(funcl_count * 0x4 * 13, 0x10000), vm::main);
+		ppu_register_range(cleanup_code_addr, ::align(funcl_count * 0x4 * 13, 0x10000));
+	}
 
 	// Apply modifications sequentially
 	for (const auto& p : found->second)
