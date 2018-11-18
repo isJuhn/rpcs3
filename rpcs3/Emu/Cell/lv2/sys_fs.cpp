@@ -252,12 +252,6 @@ lv2_file::open_result_t lv2_file::open(std::string_view vpath, s32 flags, s32 mo
 		return {CELL_ENOTMOUNTED, path};
 	}
 
-	// TODO: other checks for path
-	if (strcmp(path.get_ptr(), "/dev_hdd0") == 0)
-	{
-		local_path = fs::get_config_dir() + "imagedump/hdd0.dsk";
-	}
-
 	if (fs::is_dir(local_path))
 	{
 		return {CELL_EISDIR, path};
