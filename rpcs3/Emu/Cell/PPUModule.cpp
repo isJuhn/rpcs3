@@ -250,7 +250,7 @@ static void ppu_initialize_modules(const std::shared_ptr<ppu_linkage_info>& link
 		&ppu_module_manager::sceNpTrophy,
 		&ppu_module_manager::sceNpTus,
 		&ppu_module_manager::sceNpUtil,
-	//	&ppu_module_manager::sys_io,
+		&ppu_module_manager::sys_io,
 		&ppu_module_manager::sys_net,
 		&ppu_module_manager::sysPrxForUser,
 		&ppu_module_manager::sys_libc,
@@ -543,6 +543,8 @@ static auto ppu_load_exports(const std::shared_ptr<ppu_linkage_info>& link, u32 
 					const u32 _entry = vm::read32(faddr);
 					const u32 target = ppu_function_manager::addr + 8 * _sf->index;
 
+					LOG_WARNING(LOADER, "patching function %s at 0x%x with 0x%x", _sf->name, _entry, target);
+
 					if ((target <= _entry && _entry - target <= 0x2000000) || (target > _entry && target - _entry < 0x2000000))
 					{
 						// Use relative branch
@@ -558,7 +560,7 @@ static auto ppu_load_exports(const std::shared_ptr<ppu_linkage_info>& link, u32 
 						LOG_FATAL(LOADER, "Failed to patch function at 0x%x (0x%x)", _entry, target);
 					}
 				}
-				else
+				// else
 				{
 					// Set exported function
 					flink.export_addr = faddr;

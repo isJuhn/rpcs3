@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "Emu/System.h"
 #include "Emu/IdManager.h"
 #include "Emu/Cell/PPUModule.h"
@@ -829,29 +829,29 @@ s32 sys_io_3733EA3C(u32 port_no, vm::ptr<u32> device_type, vm::ptr<CellPadData> 
 	return cellPadGetDataExtra(port_no, device_type, data);
 }
 
-void cellPad_init()
+DECLARE(ppu_module_manager::sys_io)("sys_io", []()
 {
-	REG_FUNC(sys_io, cellPadInit);
-	REG_FUNC(sys_io, cellPadEnd);
-	REG_FUNC(sys_io, cellPadClearBuf);
-	REG_FUNC(sys_io, cellPadGetData);
-	REG_FUNC(sys_io, cellPadGetRawData); //
-	REG_FUNC(sys_io, cellPadGetDataExtra);
-	REG_FUNC(sys_io, cellPadSetActDirect);
-	REG_FUNC(sys_io, cellPadGetInfo); //
-	REG_FUNC(sys_io, cellPadGetInfo2);
-	REG_FUNC(sys_io, cellPadPeriphGetInfo);
-	REG_FUNC(sys_io, cellPadPeriphGetData);
-	REG_FUNC(sys_io, cellPadSetPortSetting);
-	REG_FUNC(sys_io, cellPadInfoPressMode); //
-	REG_FUNC(sys_io, cellPadInfoSensorMode); //
-	REG_FUNC(sys_io, cellPadSetPressMode); //
-	REG_FUNC(sys_io, cellPadSetSensorMode); //
-	REG_FUNC(sys_io, cellPadGetCapabilityInfo); //
-	REG_FUNC(sys_io, cellPadLddRegisterController);
-	REG_FUNC(sys_io, cellPadLddDataInsert);
-	REG_FUNC(sys_io, cellPadLddGetPortNo);
-	REG_FUNC(sys_io, cellPadLddUnregisterController);
+	REG_FUNC(sys_io, cellPadInit).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadEnd).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadClearBuf).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadGetData).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadGetRawData).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadGetDataExtra).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadSetActDirect).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadGetInfo).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadGetInfo2).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadPeriphGetInfo).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadPeriphGetData).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadSetPortSetting).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadInfoPressMode).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadInfoSensorMode).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadSetPressMode).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadSetSensorMode).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadGetCapabilityInfo).flag(MFF_FORCED_HLE); //
+	REG_FUNC(sys_io, cellPadLddRegisterController).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadLddDataInsert).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadLddGetPortNo).flag(MFF_FORCED_HLE);
+	REG_FUNC(sys_io, cellPadLddUnregisterController).flag(MFF_FORCED_HLE);
 
-	REG_FNID(sys_io, 0x3733EA3C, sys_io_3733EA3C);
-}
+	REG_FNID(sys_io, 0x3733EA3C, sys_io_3733EA3C).flag(MFF_FORCED_HLE);
+});
