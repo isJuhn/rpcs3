@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "PPUOpcodes.h"
 #include "PPUModule.h"
 #include "PPUAnalyser.h"
@@ -1118,7 +1118,7 @@ void ppu_module::analyse(u32 lib_toc, u32 entry)
 
 					if (target < start || target >= end)
 					{
-						LOG_WARNING(PPU, "[0x%x] Invalid branch at 0x%x -> 0x%x", func.addr, iaddr, target);
+						// LOG_WARNING(PPU, "[0x%x] Invalid branch at 0x%x -> 0x%x", func.addr, iaddr, target);
 						continue;
 					}
 

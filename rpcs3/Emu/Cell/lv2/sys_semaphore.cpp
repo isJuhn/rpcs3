@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "Emu/Memory/vm.h"
 #include "Emu/System.h"
 #include "Emu/IdManager.h"
@@ -51,6 +51,9 @@ error_code sys_semaphore_create(vm::ptr<u32> sem_id, vm::ptr<sys_semaphore_attri
 	}
 
 	*sem_id = idm::last_id();
+
+	sys_semaphore.warning("sys_semaphore ID=0x%x created", *sem_id);
+
 	return CELL_OK;
 }
 

@@ -1257,7 +1257,7 @@ void Emulator::Run()
 };
 	auto w = fxm::make<wrapper>();
 
-	/*thread_ctrl::spawn(w->thread, "helperthread", [this]()
+	thread_ctrl::spawn("helperthread", [this]()
 	{
 		std::this_thread::sleep_for(5s);
 		//auto q = lv2_event_queue::find(0x12340098);
@@ -1283,7 +1283,7 @@ void Emulator::Run()
 		while (!Emu.IsStopped())
 		{
 			{
-				semaphore_lock lock(queue->mutex);
+				std::lock_guard lock(queue->mutex);
 				while (!queue->events.empty())
 				{
 					u64 a1, a2, a3, a4;
@@ -1296,7 +1296,7 @@ void Emulator::Run()
 			}
 			thread_ctrl::wait_for(1000);
 		}
-	});*/
+	});
 
 #ifdef WITH_GDB_DEBUGGER
 	// Initialize debug server at the end of emu run sequence

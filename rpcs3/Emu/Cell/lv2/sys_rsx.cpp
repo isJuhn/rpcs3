@@ -484,6 +484,24 @@ s32 sys_rsx_device_map(vm::ptr<u64> dev_addr, vm::ptr<u64> a2, u32 dev_id)
 {
 	sys_rsx.warning("sys_rsx_device_map(dev_addr=*0x%x, a2=*0x%x, dev_id=0x%x)", dev_addr, a2, dev_id);
 
+	// audio 
+	if (dev_id == 3) {
+
+		for (u32 addr = 0x40000000; addr < 0xC0000000; addr += 0x10000000)
+		{
+			if (vm::map(addr, 0x10000000, 0x400))
+			{
+				vm::falloc(addr, 0x400000);
+
+				*dev_addr = addr;
+
+				return CELL_OK;
+			}
+		}
+		//fmt::throw_exception("sys_rsx_device_map: Invalid dev_id %d", dev_id);
+		return CELL_ENOMEM;
+	}
+
 	if (dev_id != 8) {
 		// TODO: lv1 related
 		fmt::throw_exception("sys_rsx_device_map: Invalid dev_id %d", dev_id);
