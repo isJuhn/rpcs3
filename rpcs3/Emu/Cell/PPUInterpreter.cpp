@@ -11,6 +11,8 @@
 #define _mm_shuffle_epi8
 #endif
 
+extern void execute_HLE(ppu_thread& ppu, u64 code, bool lk);
+
 inline u64 dup32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
 // Write values to CR field
@@ -4873,6 +4875,13 @@ bool ppu_interpreter::FCFID(ppu_thread& ppu, ppu_opcode_t op)
 	_mm_store_sd(&ppu.fpr[op.frd], _mm_cvtsi64_sd(_mm_setzero_pd(), std::bit_cast<s64>(ppu.fpr[op.frb])));
 	if (UNLIKELY(op.rc)) fmt::throw_exception("%s: op.rc", __func__); //ppu_cr_set(ppu, 1, ppu.fpscr.fg, ppu.fpscr.fl, ppu.fpscr.fe, ppu.fpscr.fu);
 	return true;
+}
+
+bool ppu_interpreter::KOT(ppu_thread& ppu, ppu_opcode_t op)
+{
+	execute_HLE(ppu, op.li, op.lk);
+
+	return false;
 }
 
 bool ppu_interpreter::UNK(ppu_thread& ppu, ppu_opcode_t op)

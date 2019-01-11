@@ -4277,6 +4277,11 @@ void PPUTranslator::FCFID(ppu_opcode_t op)
 	SetFPRF(result, op.rc != 0);
 }
 
+void PPUTranslator::KOT(ppu_opcode_t op)
+{
+
+}
+
 void PPUTranslator::UNK(ppu_opcode_t op)
 {
 	FlushRegisters();

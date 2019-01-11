@@ -112,6 +112,7 @@
     <ClCompile Include="..\Utilities\Thread.cpp" />
     <ClCompile Include="..\Utilities\version.cpp" />
     <ClCompile Include="..\Utilities\VirtualMemory.cpp" />
+    <ClCompile Include="Emu\Cell\dllHLE.cpp" />
     <ClCompile Include="Emu\Cell\lv2\sys_gpio.cpp" />
     <ClCompile Include="Emu\Cell\lv2\sys_net.cpp" />
     <ClCompile Include="Emu\Cell\Modules\StaticHLE.cpp" />

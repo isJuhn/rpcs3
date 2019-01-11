@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "PPUOpcodes.h"
 
@@ -349,6 +349,7 @@ struct ppu_interpreter
 	static bool FCTID(ppu_thread&, ppu_opcode_t);
 	static bool FCTIDZ(ppu_thread&, ppu_opcode_t);
 	static bool FCFID(ppu_thread&, ppu_opcode_t);
+	static bool KOT(ppu_thread&, ppu_opcode_t);
 
 	static bool UNK(ppu_thread&, ppu_opcode_t);
 };

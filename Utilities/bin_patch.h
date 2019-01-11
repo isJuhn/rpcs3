@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "BEType.h"
 #include <vector>
@@ -19,6 +19,7 @@ enum class patch_type
 	be64,
 	bef32,
 	bef64,
+	func,
 };
 
 class patch_engine
@@ -28,10 +29,13 @@ class patch_engine
 		patch_type type;
 		u32 offset;
 		u64 value;
+		std::string str;
 	};
 
 	// Database
 	std::unordered_map<std::string, std::vector<patch>> m_map;
+
+	bool dll_hle = false;
 
 public:
 	// Load from file

@@ -781,6 +781,8 @@
     </ClCompile>
     <ClCompile Include="Emu\Cell\lv2\sys_overlay.cpp">
       <Filter>Emu\Cell\lv2</Filter>
+    <ClCompile Include="Emu\Cell\dllHLE.cpp">
+      <Filter>Emu\Cell</Filter>
     </ClCompile>
     <ClCompile Include="Emu\RSX\Overlays\overlay_save_dialog.cpp">
       <Filter>Emu\GPU\RSX\Overlays</Filter>

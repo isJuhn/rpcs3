@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "PPUOpcodes.h"
 #include "PPUModule.h"
 #include "PPUAnalyser.h"
@@ -3380,6 +3380,10 @@ void ppu_acontext::FCTIDZ(ppu_opcode_t op)
 }
 
 void ppu_acontext::FCFID(ppu_opcode_t op)
+{
+}
+
+void ppu_acontext::KOT(ppu_opcode_t op)
 {
 }
 

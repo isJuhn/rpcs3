@@ -1,7 +1,10 @@
-#include "bin_patch.h"
+﻿#include "bin_patch.h"
 #include <yaml-cpp/yaml.h>
 #include "File.h"
 #include "Config.h"
+
+extern void init_dll();
+extern u64 register_function(const std::string& name);
 
 template <>
 void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
@@ -22,6 +25,7 @@ void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
 		case patch_type::be64: return "be64";
 		case patch_type::lef32: return "lef32";
 		case patch_type::lef64: return "lef64";
+		case patch_type::func: return "func";
 		}
 
 		return unknown;
@@ -95,6 +99,14 @@ void patch_engine::append(const std::string& patch)
 					info.value = std::bit_cast<u64>(patch[2].as<f64>());
 					break;
 				}
+				case patch_type::func:
+				{
+					const auto& str = patch[2].Scalar();
+					info.str.resize(str.size());
+					info.str.assign(str);
+					dll_hle = true;
+					break;
+				}
 				default:
 				{
 					info.value = patch[2].as<u64>();
@@ -115,6 +127,11 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 	if (found == m_map.cend())
 	{
 		return 0;
+	}
+
+	if (dll_hle)
+	{
+		init_dll();
 	}
 
 	// Apply modifications sequentially
@@ -166,6 +183,13 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 		case patch_type::bef64:
 		{
 			*reinterpret_cast<be_t<u64, 1>*>(ptr) = static_cast<u64>(p.value);
+			break;
+		}
+		case patch_type::func:
+		{
+			u32 index = register_function(p.str);
+			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ (0x3c << 26) | (index << 2) };
+			LOG_NOTICE(LOADER, "Patched function at 0x%x with HLE function %s with index %d", p.offset, p.str, index);
 			break;
 		}
 		}
