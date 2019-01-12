@@ -3,8 +3,8 @@
 #include "File.h"
 #include "Config.h"
 
-extern void init_dll();
-extern u64 register_function(const std::string& name);
+extern void init_dll(const std::string& dll, const std::string& hash);
+extern u64 register_function(const std::string& dll, const std::string& name);
 
 template <>
 void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
@@ -26,6 +26,7 @@ void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
 		case patch_type::lef32: return "lef32";
 		case patch_type::lef64: return "lef64";
 		case patch_type::func: return "func";
+		case patch_type::dll: return "dll";
 		}
 
 		return unknown;
@@ -99,12 +100,16 @@ void patch_engine::append(const std::string& patch)
 					info.value = std::bit_cast<u64>(patch[2].as<f64>());
 					break;
 				}
+				case patch_type::dll:
+				{
+					dll_hle = true;
+					[[fallthrough]];
+				}
 				case patch_type::func:
 				{
 					const auto& str = patch[2].Scalar();
 					info.str.resize(str.size());
 					info.str.assign(str);
-					dll_hle = true;
 					break;
 				}
 				default:
@@ -129,10 +134,7 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 		return 0;
 	}
 
-	if (dll_hle)
-	{
-		init_dll();
-	}
+	std::string dll{};
 
 	// Apply modifications sequentially
 	for (const auto& p : found->second)
@@ -185,9 +187,15 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 			*reinterpret_cast<be_t<u64, 1>*>(ptr) = static_cast<u64>(p.value);
 			break;
 		}
+		case patch_type::dll:
+		{
+			dll = p.str;
+			init_dll(dll, name);
+			break;
+		}
 		case patch_type::func:
 		{
-			u32 index = register_function(p.str);
+			u32 index = register_function(dll, p.str);
 			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ (0x3c << 26) | (index << 2) };
 			LOG_NOTICE(LOADER, "Patched function at 0x%x with HLE function %s with index %d", p.offset, p.str, index);
 			break;

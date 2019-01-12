@@ -10,23 +10,23 @@ using dll_init_t = void(__cdecl*)(const std::vector<void*>&);
 
 std::vector<dll_function_t> g_func_table{};
 std::unordered_map<std::string, u64> g_name_to_index_map{};
-HINSTANCE hGetProcIDDLL;
+std::unordered_map<std::string, HINSTANCE> g_name_to_dll{};
 
-extern void init_dll()
+extern void init_dll(const std::string& dll, const std::string& hash)
 {
 	char szFullPath[MAX_PATH] = {};
 	GetCurrentDirectoryA(MAX_PATH, szFullPath);
-	strcat_s(szFullPath, "\\dllHLE.dll");
-	hGetProcIDDLL = LoadLibraryA(szFullPath);
+	strcat_s(szFullPath, fmt::format("\\%s", dll).c_str());
+	g_name_to_dll[dll] = LoadLibraryA(szFullPath);
 
-	if (!hGetProcIDDLL)
+	if (!g_name_to_dll[dll])
 	{
 		LOG_ERROR(PPU, "Could not load HLE dynamic library %s", szFullPath);
 		return;
 	}
 	LOG_WARNING(PPU, "Loaded HLE dynamic library %s", szFullPath);
 
-	dll_init_t init_dll = (dll_init_t)GetProcAddress(hGetProcIDDLL, "init_dll");
+	dll_init_t init_dll = (dll_init_t)GetProcAddress(g_name_to_dll[dll], "init_dll");
 	if (!init_dll)
 	{
 		LOG_ERROR(PPU, "Could not locate dll_init function");
@@ -39,18 +39,18 @@ extern void init_dll()
 	std::function<void(ppu_thread&, u32, u32)> stack_dealloc = [](ppu_thread& ppu, u32 addr, u32 size) {ppu.stack_pop_verbose(addr, size); };
 	std::function<void(ppu_thread&, u32)> do_call = [](ppu_thread& ppu, u32 addr) {vm::ptr<void(void)> ptr{ vm::addr_t{ addr } }; ptr(ppu); };
 
-	std::vector<void*> table{ (void*)&vm::g_base_addr, &write32, &read32, &stack_alloc, &stack_dealloc, &do_call };
+	std::vector<void*> table{ (void*)&vm::g_base_addr, (void*)&hash, &write32, &read32, &stack_alloc, &stack_dealloc, &do_call };
 	init_dll(table);
 }
 
-extern u64 register_function(const std::string& name)
+extern u64 register_function(const std::string& dll, const std::string& name)
 {
 	if (g_name_to_index_map.find(name) != g_name_to_index_map.end())
 	{
 		return g_name_to_index_map[name];
 	}
 
-	dll_function_t func = (dll_function_t)GetProcAddress(hGetProcIDDLL, name.c_str());
+	dll_function_t func = (dll_function_t)GetProcAddress(g_name_to_dll[dll], name.c_str());
 	if (!func)
 	{
 		LOG_ERROR(PPU, "Could not locate dll HLE function %s", name);

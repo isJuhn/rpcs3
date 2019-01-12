@@ -167,6 +167,7 @@ extern void ppu_initialize();
 extern void ppu_initialize(const ppu_module& info);
 static void ppu_initialize2(class jit_compiler& jit, const ppu_module& module_part, const std::string& cache_path, const std::string& obj_name);
 extern void ppu_execute_syscall(ppu_thread& ppu, u64 code);
+extern void execute_HLE(ppu_thread& ppu, u64 code, bool lk);
 
 // Get pointer to executable cache
 static u64& ppu_ref(u32 addr)
@@ -1373,6 +1374,7 @@ extern void ppu_initialize(const ppu_module& info)
 			{ "__stvlx", s_use_ssse3 ? (u64)&sse_cellbe_stvlx : (u64)&sse_cellbe_stvlx_v0 },
 			{ "__stvrx", s_use_ssse3 ? (u64)&sse_cellbe_stvrx : (u64)&sse_cellbe_stvrx_v0 },
 			{ "__resupdate", (u64)&vm::reservation_update },
+			{ "__exec_hle", (u64)&execute_HLE },
 		};
 
 		for (u64 index = 0; index < 1024; index++)

@@ -4279,7 +4279,10 @@ void PPUTranslator::FCFID(ppu_opcode_t op)
 
 void PPUTranslator::KOT(ppu_opcode_t op)
 {
-
+	RegStore(Trunc(GetAddr()), m_cia);
+	FlushRegisters();
+	Call(GetType<void>(), "__exec_hle", m_thread, m_ir->getInt64(op.li), m_ir->getInt1(op.lk))->setTailCallKind(llvm::CallInst::TCK_Tail);
+	m_ir->CreateRetVoid();
 }
 
 void PPUTranslator::UNK(ppu_opcode_t op)
