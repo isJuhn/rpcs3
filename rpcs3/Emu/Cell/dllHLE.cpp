@@ -1,8 +1,10 @@
 ﻿#include "stdafx.h"
 
+#include "Emu/IdManager.h"
 #include "Emu/Cell/PPUFunction.h"
 #include "PPUCallback.h"
 #include "Emu/System.h"
+#include "Emu/RSX/Overlays/overlays.h"
 #include <Windows.h>
 
 using dll_function_t = void(__cdecl*)(ppu_thread&);
@@ -33,13 +35,28 @@ extern void init_dll(const std::string& dll, const std::string& hash)
 		return;
 	}
 
-	std::function<void(u32, be_t<u32>)> write32 = vm::write32;
-	std::function<const be_t<u32>&(u32)> read32 = vm::read32;
-	std::function<u32(ppu_thread&, u32, u32)> stack_alloc = [](ppu_thread& ppu, u32 size, u32 align) {return ppu.stack_push(size, align); };
-	std::function<void(ppu_thread&, u32, u32)> stack_dealloc = [](ppu_thread& ppu, u32 addr, u32 size) {ppu.stack_pop_verbose(addr, size); };
-	std::function<void(ppu_thread&, u32)> do_call = [](ppu_thread& ppu, u32 addr) {vm::ptr<void(void)> ptr{ vm::addr_t{ addr } }; ptr(ppu); };
+	std::function<void(u32 addr, be_t<u32> value)> write32 = vm::write32;
+	std::function<const be_t<u32>&(u32 addr)> read32 = vm::read32;
+	std::function<u32(ppu_thread&, u32 size, u32 align)> stack_alloc = [](ppu_thread& ppu, u32 size, u32 align) {return ppu.stack_push(size, align); };
+	std::function<void(ppu_thread&, u32 addr, u32 size)> stack_dealloc = [](ppu_thread& ppu, u32 addr, u32 size) {ppu.stack_pop_verbose(addr, size); };
+	std::function<void(ppu_thread&, u32 addr)> do_call = [](ppu_thread& ppu, u32 addr) {vm::ptr<void(void)> ptr{ vm::addr_t{ addr } }; ptr(ppu); };
 
-	std::vector<void*> table{ (void*)&vm::g_base_addr, (void*)&hash, &write32, &read32, &stack_alloc, &stack_dealloc, &do_call };
+	std::function<void(const std::string& text, int x, int y, int font_size, color4f color, const std::string& font)> draw_text =
+		[](const std::string& text, int x, int y, int font_size, color4f color, const std::string& font) {
+		if (auto manager = fxm::get<rsx::overlays::display_manager>())
+		{
+				manager->get<rsx::overlays::HLE_overlay>()->draw_text(text, x, y, font_size, color, font);
+		}
+	};
+
+	std::function<void(int x, int y, int w, int h, color4f col)> draw_square = [](int x, int y, int w, int h, color4f col) {
+		if (auto manager = fxm::get<rsx::overlays::display_manager>())
+		{
+			manager->get<rsx::overlays::HLE_overlay>()->draw_square(x, y, w, h, col);
+		}
+	};
+
+	std::vector<void*> table{ (void*)&vm::g_base_addr, (void*)&hash, &write32, &read32, &stack_alloc, &stack_dealloc, &do_call, &draw_text, &draw_square };
 	init_dll(table);
 }
 

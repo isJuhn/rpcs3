@@ -416,6 +416,8 @@ namespace rsx
 		{
 			m_overlay_manager = fxm::make_always<rsx::overlays::display_manager>();
 
+			m_overlay_manager->create<rsx::overlays::HLE_overlay>();
+
 			if (g_cfg.video.perf_overlay.perf_overlay_enabled)
 			{
 				auto perf_overlay = m_overlay_manager->create<rsx::overlays::perf_metrics_overlay>();

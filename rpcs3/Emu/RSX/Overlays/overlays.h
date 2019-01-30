@@ -594,5 +594,51 @@ namespace rsx
 
 			compiled_resource get_compiled() override;
 		};
+
+		struct HLE_overlay : overlay
+		{
+		private:
+
+			std::vector<overlay_element> v_elements{};
+
+		public:
+
+			HLE_overlay() = default;
+			~HLE_overlay() = default;
+
+			void draw_text(const std::string& str, int x, int y, int font_size, color4f col, const std::string& font)
+			{
+				label text{str.c_str()};
+				text.set_font(font.c_str(), ::narrow<u16>(font_size));
+				text.back_color.a = 0.f;
+				text.fore_color = col;
+				text.auto_resize();
+				text.set_pos(::narrow<u16>(x), ::narrow<u16>(y));
+				v_elements.push_back(text);
+			}
+
+			void draw_square(int x, int y, int w, int h, color4f col)
+			{
+				overlay_element square{::narrow<u16>(w), ::narrow<u16>(h)};
+				square.set_pos(::narrow<u16>(x), ::narrow<u16>(y));
+				square.back_color = col;
+				v_elements.push_back(square);
+			}
+
+			void update() override
+			{
+				v_elements.clear();
+			}
+
+			compiled_resource get_compiled() override
+			{
+				compiled_resource result;
+
+				for (auto& element : v_elements)
+					result.add(element.get_compiled());
+
+				return result;
+			}
+		};
 	}
 }
