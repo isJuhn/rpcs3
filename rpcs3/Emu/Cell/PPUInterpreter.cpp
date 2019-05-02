@@ -12,6 +12,7 @@
 #endif
 
 extern void execute_HLE(ppu_thread& ppu, u64 code, bool lk);
+extern std::unordered_map<u32, u32> g_addr_to_old_op;
 
 inline u64 dup32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
@@ -4880,6 +4881,11 @@ bool ppu_interpreter::FCFID(ppu_thread& ppu, ppu_opcode_t op)
 bool ppu_interpreter::KOT(ppu_thread& ppu, ppu_opcode_t op)
 {
 	execute_HLE(ppu, op.li, op.lk);
+
+	if (op.lk)
+	{
+		ppu_interpreter_exec_single(ppu, g_addr_to_old_op[ppu.cia]);
+	}
 
 	return false;
 }

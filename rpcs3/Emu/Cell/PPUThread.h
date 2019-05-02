@@ -289,3 +289,5 @@ inline To ppu_gpr_cast(const From& value)
 {
 	return ppu_gpr_cast_impl<To>::from(ppu_gpr_cast_impl<From>::to(value));
 }
+
+void ppu_interpreter_exec_single(ppu_thread& ppu, u32 op);

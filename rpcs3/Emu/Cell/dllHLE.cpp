@@ -13,6 +13,7 @@ using dll_init_t = void(__cdecl*)(const std::vector<void*>&);
 std::vector<dll_function_t> g_func_table{};
 std::unordered_map<std::string, u64> g_name_to_index_map{};
 std::unordered_map<std::string, HINSTANCE> g_name_to_dll{};
+std::unordered_map<u32, u32> g_addr_to_old_op{};
 
 extern void init_dll(const std::string& dll, const std::string& hash)
 {
@@ -95,20 +96,16 @@ extern void execute_HLE(ppu_thread& ppu, u64 code, bool lk)
 	if (code < g_func_table.size())
 	{
 		auto func = g_func_table[code];
-		if (lk)
+		const auto old_f = ppu.last_function;
+		ppu.last_function = fmt::format("dll HLE #0x%x", code).c_str();
+		func(ppu);
+		ppu.last_function = old_f;
+		if (!lk)
 		{
-
-		}
-		else
-		{
-			const auto old_f = ppu.last_function;
-			ppu.last_function = fmt::format("dll HLE #0x%x", code).c_str();
-			func(ppu);
-			ppu.last_function = old_f;
 			ppu.cia = ppu.lr;
-			LOG_TRACE(PPU, "dll HLE function 0x%x finished, r3=0x%llx", code, ppu.gpr[3]);
-			return;
 		}
+		LOG_TRACE(PPU, "dll HLE function 0x%x finished, r3=0x%llx", code, ppu.gpr[3]);
+		return;
 	}
 
 	fmt::throw_exception("Invalid dll HLE function number (0x%x)", code);

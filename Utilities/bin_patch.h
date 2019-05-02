@@ -20,6 +20,7 @@ enum class patch_type
 	bef32,
 	bef64,
 	func,
+	funcl,
 	dll,
 };
 

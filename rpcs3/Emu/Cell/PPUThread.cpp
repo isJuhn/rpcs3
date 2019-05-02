@@ -235,6 +235,18 @@ void ppu_recompiler_fallback(ppu_thread& ppu)
 	}
 }
 
+void ppu_interpreter_exec_single(ppu_thread& ppu, u32 op)
+{
+	const auto& table = g_ppu_interpreter_fast.get_table();
+	const auto cache = vm::g_exec_addr;
+
+	if (LIKELY(table[ppu_decode(op)](ppu, { op })))
+	{
+		ppu.cia += 4;
+	}
+	return;
+}
+
 static std::unordered_map<u32, u32>* s_ppu_toc;
 
 static bool ppu_check_toc(ppu_thread& ppu, ppu_opcode_t op)

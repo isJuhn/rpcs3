@@ -7,6 +7,8 @@
 #include "../Utilities/Log.h"
 #include <algorithm>
 
+extern std::unordered_map<u32, u32> g_addr_to_old_op;
+
 using namespace llvm;
 
 const ppu_decoder<PPUTranslator> s_ppu_decoder;
@@ -4282,7 +4284,17 @@ void PPUTranslator::KOT(ppu_opcode_t op)
 	RegStore(Trunc(GetAddr()), m_cia);
 	FlushRegisters();
 	Call(GetType<void>(), "__exec_hle", m_thread, m_ir->getInt64(op.li), m_ir->getInt1(op.lk))->setTailCallKind(llvm::CallInst::TCK_Tail);
-	m_ir->CreateRetVoid();
+
+	if (op.lk)
+	{
+		const u64 base = m_reloc ? m_reloc->addr : 0;
+		const u32 instr = g_addr_to_old_op[m_addr + base];
+		(this->*(s_ppu_decoder.decode(instr)))({ instr });
+	}
+	else
+	{
+		m_ir->CreateRetVoid();
+	}
 }
 
 void PPUTranslator::UNK(ppu_opcode_t op)

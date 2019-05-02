@@ -5,6 +5,7 @@
 
 extern void init_dll(const std::string& dll, const std::string& hash);
 extern u64 register_function(const std::string& dll, const std::string& name);
+extern std::unordered_map<u32, u32> g_addr_to_old_op;
 
 template <>
 void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
@@ -26,6 +27,7 @@ void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
 		case patch_type::lef32: return "lef32";
 		case patch_type::lef64: return "lef64";
 		case patch_type::func: return "func";
+		case patch_type::funcl: return "funcl";
 		case patch_type::dll: return "dll";
 		}
 
@@ -106,6 +108,7 @@ void patch_engine::append(const std::string& patch)
 					[[fallthrough]];
 				}
 				case patch_type::func:
+				case patch_type::funcl:
 				{
 					const auto& str = patch[2].Scalar();
 					info.str.resize(str.size());
@@ -194,9 +197,16 @@ std::size_t patch_engine::apply(const std::string& name, u8* dst) const
 			break;
 		}
 		case patch_type::func:
+		case patch_type::funcl:
 		{
 			u32 index = register_function(dll, p.str);
-			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ (0x3c << 26) | (index << 2) };
+			u32 lk{ 0 };
+			if (p.type == patch_type::funcl)
+			{
+				lk = 1;
+				g_addr_to_old_op[p.offset] = *reinterpret_cast<be_t<u32, 1>*>(ptr);
+			}
+			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ (0x3c << 26) | (index << 2) | lk };
 			LOG_NOTICE(LOADER, "Patched function at 0x%x with HLE function %s with index %d", p.offset, p.str, index);
 			break;
 		}
