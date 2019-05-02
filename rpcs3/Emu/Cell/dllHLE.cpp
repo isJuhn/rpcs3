@@ -56,7 +56,14 @@ extern void init_dll(const std::string& dll, const std::string& hash)
 		}
 	};
 
-	std::vector<void*> table{ (void*)&vm::g_base_addr, (void*)&hash, &write32, &read32, &stack_alloc, &stack_dealloc, &do_call, &draw_text, &draw_square };
+	std::function<void(int x, int y, int w, int h, const std::string& filename)> draw_image = [](int x, int y, int w, int h, const std::string& filename) {
+		if (auto manager = fxm::get<rsx::overlays::display_manager>())
+		{
+			manager->get<rsx::overlays::HLE_overlay>()->draw_image(x, y, w, h, filename);
+		}
+	};
+
+	std::vector<void*> table{ (void*)&vm::g_base_addr, (void*)&hash, &write32, &read32, &stack_alloc, &stack_dealloc, &do_call, &draw_text, &draw_square, &draw_image };
 	init_dll(table);
 }
 
