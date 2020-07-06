@@ -4,6 +4,8 @@
 #include "sys_process.h"
 #include "Emu/IdManager.h"
 #include "Emu/Cell/PPUThread.h"
+#include "Crypto/aes.h"
+#include "Crypto/key_vault.h"
 
 
 extern u64 get_timebased_time();
@@ -279,6 +281,41 @@ error_code sys_ss_update_manager(u64 pkg_id, u64 a1, u64 a2, u64 a3, u64 a4, u64
 error_code sys_ss_virtual_trm_manager(u64 pkg_id, u64 a1, u64 a2, u64 a3, u64 a4)
 {
 	sys_ss.todo("sys_ss_virtual_trm_manager(pkg=0x%llx, a1=0x%llx, a2=0x%llx, a3=0x%llx, a4=0x%llx)", pkg_id, a1, a2, a3, a4);
+
+	if (!g_ps3_process_info.has_root_perm())
+	{
+		return CELL_ENOSYS;
+	}
+
+	auto form_key = [](u64 laid, u64 paid, u8 output[16])
+	{
+		for (int i = 0; i < 16; ++i)
+		{
+			output[i] = SC_KEY_FOR_MASTER[i] ^ (i < 8 ? laid >> (7 - i) * 8 & 0xff : paid >> (15 - i) * 8 & 0xff);
+		}
+	};
+
+	switch (pkg_id)
+	{
+	case SYS_SS_VTRM_PACKET_DECRYPT_MASTER:
+		const u64 authid = g_ps3_process_info.self_info.valid ?
+			g_ps3_process_info.self_info.app_info.authid : 0;
+		u8 key[16];
+		form_key(0x1070000002000001ull, authid, key);
+		u8 iv[16];
+		u8 data[0x40];
+		std::memcpy(iv, vm::_ref<u8*>(a1), 0x10);
+		std::memcpy(data, vm::_ref<u8*>(a2), 0x40);
+
+		aes_context ctx;
+		aes_setkey_dec(&ctx, key, 128);
+		u8 res_buf[40];
+		aes_crypt_cbc(&ctx, AES_DECRYPT, 0x40, iv, data, res_buf);
+		std::memcpy(vm::_ref<u8*>(a2), res_buf, 0x40);
+		break;
+	default:
+		break;
+	}
 
 	return CELL_OK;
 }
