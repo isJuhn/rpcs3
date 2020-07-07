@@ -298,21 +298,23 @@ error_code sys_ss_virtual_trm_manager(u64 pkg_id, u64 a1, u64 a2, u64 a3, u64 a4
 	switch (pkg_id)
 	{
 	case SYS_SS_VTRM_PACKET_DECRYPT_MASTER:
+	{
 		const u64 authid = g_ps3_process_info.self_info.valid ?
 			g_ps3_process_info.self_info.app_info.authid : 0;
 		u8 key[16];
 		form_key(0x1070000002000001ull, authid, key);
 		u8 iv[16];
 		u8 data[0x40];
-		std::memcpy(iv, vm::_ref<u8*>(a1), 0x10);
-		std::memcpy(data, vm::_ref<u8*>(a2), 0x40);
+		std::memcpy(iv, vm::_ptr<u8>(a1), 0x10);
+		std::memcpy(data, vm::_ptr<u8>(a2), 0x40);
 
 		aes_context ctx;
 		aes_setkey_dec(&ctx, key, 128);
 		u8 res_buf[40];
 		aes_crypt_cbc(&ctx, AES_DECRYPT, 0x40, iv, data, res_buf);
-		std::memcpy(vm::_ref<u8*>(a2), res_buf, 0x40);
+		std::memcpy(vm::_ptr<u8>(a2), res_buf, 0x40);
 		break;
+	}
 	default:
 		break;
 	}
