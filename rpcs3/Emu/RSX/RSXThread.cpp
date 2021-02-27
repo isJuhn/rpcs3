@@ -14,6 +14,7 @@
 #include "Emu/Cell/lv2/sys_event.h"
 #include "Emu/Cell/Modules/cellGcmSys.h"
 #include "Overlays/overlay_perf_metrics.h"
+#include "Overlays/overlay_hle.h"
 #include "Utilities/date_time.h"
 #include "Utilities/span.h"
 #include "Utilities/StrUtil.h"
@@ -383,6 +384,7 @@ namespace rsx
 		if (g_cfg.misc.use_native_interface && (g_cfg.video.renderer == video_renderer::opengl || g_cfg.video.renderer == video_renderer::vulkan))
 		{
 			m_overlay_manager = g_fxo->init<rsx::overlays::display_manager>(0);
+			m_overlay_manager->create<rsx::overlays::HLE_overlay>();
 		}
 
 		state -= cpu_flag::stop + cpu_flag::wait; // TODO: Remove workaround

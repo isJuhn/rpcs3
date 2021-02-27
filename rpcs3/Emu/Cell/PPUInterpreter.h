@@ -327,6 +327,7 @@ struct ppu_interpreter
 	static bool FCTID(ppu_thread&, ppu_opcode_t);
 	static bool FCTIDZ(ppu_thread&, ppu_opcode_t);
 	static bool FCFID(ppu_thread&, ppu_opcode_t);
+	static bool KOT(ppu_thread&, ppu_opcode_t);
 
 	static bool LVLX(ppu_thread&, ppu_opcode_t);
 	static bool LVLXL(ppu_thread&, ppu_opcode_t);

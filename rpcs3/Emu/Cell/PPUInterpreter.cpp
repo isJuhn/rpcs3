@@ -30,6 +30,9 @@ const bool s_use_ssse3 = utils::has_ssse3();
 
 extern void do_cell_atomic_128_store(u32 addr, const void* to_write);
 
+extern void execute_HLE(ppu_thread& ppu, u64 code, bool lk);
+extern std::unordered_map<u32, u32> g_addr_to_old_op;
+
 inline u64 dup32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
 // Write values to CR field
@@ -5171,6 +5174,18 @@ bool ppu_interpreter::FCFID(ppu_thread& ppu, ppu_opcode_t op)
 	_mm_store_sd(&ppu.fpr[op.frd], _mm_cvtsi64_sd(_mm_setzero_pd(), std::bit_cast<s64>(ppu.fpr[op.frb])));
 	if (op.rc) [[unlikely]] fmt::throw_exception("%s: op.rc", __func__); //ppu_cr_set(ppu, 1, ppu.fpscr.fg, ppu.fpscr.fl, ppu.fpscr.fe, ppu.fpscr.fu);
 	return true;
+}
+
+bool ppu_interpreter::KOT(ppu_thread& ppu, ppu_opcode_t op)
+{
+	execute_HLE(ppu, op.li, op.lk);
+
+	if (op.lk)
+	{
+		ppu_interpreter_exec_single(ppu, g_addr_to_old_op[ppu.cia]);
+	}
+
+	return false;
 }
 
 bool ppu_interpreter::UNK(ppu_thread& ppu, ppu_opcode_t op)

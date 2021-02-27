@@ -2343,6 +2343,11 @@ void PPUDisAsm::FCFID(ppu_opcode_t op)
 	DisAsm_F2_RC("fcfid", op.frd, op.frb, op.rc);
 }
 
+void PPUDisAsm::KOT(ppu_opcode_t op)
+{
+	Write(fmt::format("KOT 0x%x, 0x%x, 0x%x", op.li, op.aa, op.lk));
+}
+
 extern std::vector<std::string> g_ppu_function_names;
 
 void PPUDisAsm::UNK(ppu_opcode_t op)

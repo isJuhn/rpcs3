@@ -287,6 +287,8 @@ public:
 	static void stack_pop_verbose(u32 addr, u32 size) noexcept;
 };
 
+void ppu_interpreter_exec_single(ppu_thread& ppu, u32 op);
+
 static_assert(ppu_join_status::max <= ppu_join_status{ppu_thread::id_base});
 
 template<typename T, typename = void>

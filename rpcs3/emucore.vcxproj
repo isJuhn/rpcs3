@@ -75,6 +75,7 @@
     <ClCompile Include="Emu\Audio\Pulse\PulseBackend.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Emu\Cell\DLLHLEHandler.cpp" />
     <ClCompile Include="Emu\Io\GHLtar.cpp" />
     <ClCompile Include="Emu\Io\Buzz.cpp" />
     <ClCompile Include="Emu\Audio\AudioBackend.cpp" />
@@ -472,6 +473,7 @@
     <ClInclude Include="Emu\RSX\display.h" />
     <ClInclude Include="Emu\RSX\GSFrameBase.h" />
     <ClInclude Include="Emu\RSX\Overlays\overlay_fonts.h" />
+    <ClInclude Include="Emu\RSX\Overlays\overlay_hle.h" />
     <ClInclude Include="Emu\RSX\Overlays\overlay_message_dialog.h" />
     <ClInclude Include="Emu\RSX\Overlays\overlay_osk.h" />
     <ClInclude Include="Emu\RSX\Overlays\overlay_osk_panel.h" />

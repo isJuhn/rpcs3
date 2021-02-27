@@ -12,6 +12,8 @@
 #include "util/v128sse.hpp"
 #include <algorithm>
 
+extern std::unordered_map<u32, u32> g_addr_to_old_op;
+
 using namespace llvm;
 
 const ppu_decoder<PPUTranslator> s_ppu_decoder;
@@ -4597,6 +4599,24 @@ void PPUTranslator::FCFID(ppu_opcode_t op)
 	//SetFPSCR_FR(Call(GetType<bool>(), m_pure_attr, "__fcfid_get_fr", b));
 	//SetFPSCR_FI(Call(GetType<bool>(), m_pure_attr, "__fcfid_get_fi", b));
 	SetFPRF(result, op.rc != 0);
+}
+
+void PPUTranslator::KOT(ppu_opcode_t op)
+{
+	RegStore(Trunc(GetAddr()), m_cia);
+	FlushRegisters();
+	Call(GetType<void>(), "__exec_hle", m_thread, m_ir->getInt64(op.li), m_ir->getInt1(op.lk))->setTailCallKind(llvm::CallInst::TCK_Tail);
+
+	if (op.lk)
+	{
+		const u64 base = m_reloc ? m_reloc->addr : 0;
+		const u32 instr = g_addr_to_old_op[m_addr + base];
+		(this->*(s_ppu_decoder.decode(instr)))({ instr });
+	}
+	else
+	{
+		m_ir->CreateRetVoid();
+	}
 }
 
 void PPUTranslator::UNK(ppu_opcode_t op)

@@ -546,6 +546,7 @@ struct ppu_itype
 		FCTID,
 		FCTIDZ,
 		FCFID,
+		KOT,
 	};
 
 	// Enable address-of operator for ppu_decoder<>
@@ -938,6 +939,7 @@ struct ppu_iname
 	NAME(FCTID)
 	NAME(FCTIDZ)
 	NAME(FCFID)
+	NAME(KOT)
 #undef NAME
 };
 
@@ -1674,4 +1676,5 @@ struct ppu_acontext
 	void FCTID(ppu_opcode_t);
 	void FCTIDZ(ppu_opcode_t);
 	void FCFID(ppu_opcode_t);
+	void KOT(ppu_opcode_t);
 };

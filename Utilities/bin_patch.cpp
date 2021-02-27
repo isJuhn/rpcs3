@@ -9,6 +9,10 @@
 
 LOG_CHANNEL(patch_log, "PAT");
 
+extern void init_dll(const std::string& dll, const std::string& hash);
+extern u64 register_function(const std::string& dll, const std::string& name);
+extern std::unordered_map<u32, u32> g_addr_to_old_op;
+
 template <>
 void fmt_class_string<YAML::NodeType::value>::format(std::string& out, u64 arg)
 {
@@ -50,6 +54,9 @@ void fmt_class_string<patch_type>::format(std::string& out, u64 arg)
 		case patch_type::lef32: return "lef32";
 		case patch_type::lef64: return "lef64";
 		case patch_type::utf8: return "utf8";
+		case patch_type::func: return "func";
+		case patch_type::funcl: return "funcl";
+		case patch_type::dll: return "dll";
 		}
 
 		return unknown;
@@ -431,6 +438,9 @@ bool patch_engine::add_patch_data(YAML::Node node, patch_info& info, u32 modifie
 	switch (p_data.type)
 	{
 	case patch_type::utf8:
+	case patch_type::func:
+	case patch_type::funcl:
+	case patch_type::dll:
 	{
 		break;
 	}
@@ -515,6 +525,8 @@ void patch_engine::append_title_patches(const std::string& title_id)
 static std::basic_string<u32> apply_modification(const patch_engine::patch_info& patch, u8* dst, u32 filesz, u32 min_addr)
 {
 	std::basic_string<u32> applied;
+
+	std::string dll{};
 
 	for (const auto& p : patch.data_list)
 	{
@@ -619,7 +631,28 @@ static std::basic_string<u32> apply_modification(const patch_engine::patch_info&
 			std::memcpy(ptr, p.original_value.data(), p.original_value.size());
 			break;
 		}
+		case patch_type::func:
+		case patch_type::funcl:
+		{
+			u32 index = register_function(dll, p.original_value);
+			u32 lk = 0;
+			if (p.type == patch_type::funcl)
+			{
+				lk = 1;
+				g_addr_to_old_op[p.offset] = *reinterpret_cast<be_t<u32, 1>*>(ptr);
+			}
+			*reinterpret_cast<be_t<u32, 1>*>(ptr) = u32{ (0x3c << 26) | (index << 2) | lk };
+			patch_log.notice("Patched function at 0x%x with HLE function %s with index %d", p.offset, p.original_value, index);
+			break;
 		}
+		case patch_type::dll:
+		{
+			dll = p.original_value;
+			init_dll(dll, patch.hash);
+			break;
+		}
+		}
+
 
 		// Possibly an executable instruction
 		applied.push_back(resval);

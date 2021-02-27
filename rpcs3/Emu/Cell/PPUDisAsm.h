@@ -667,6 +667,7 @@ public:
 	void FCTID(ppu_opcode_t op);
 	void FCTIDZ(ppu_opcode_t op);
 	void FCFID(ppu_opcode_t op);
+	void KOT(ppu_opcode_t op);
 
 	void UNK(ppu_opcode_t op);
 };

@@ -188,6 +188,7 @@ public:
 			{ 0x35, &D::STFSU },
 			{ 0x36, &D::STFD },
 			{ 0x37, &D::STFDU },
+			{ 0x3c, &D::KOT },
 		});
 
 		// Group 0x04 opcodes (field 21..31)
@@ -645,6 +646,7 @@ namespace ppu_instructions
 	inline u32 STVX(u32 vs, u32 ra, u32 rb) { ppu_opcode_t op{ 31 << 26 | 231 << 1 }; op.vs = vs; op.ra = ra; op.rb = rb; return op.opcode; }
 	inline u32 LFD(u32 frd, u32 ra, s32 si) { ppu_opcode_t op{ 50u << 26 }; op.frd = frd; op.ra = ra; op.simm16 = si; return op.opcode; }
 	inline u32 LVX(u32 vd, u32 ra, u32 rb) { ppu_opcode_t op{ 31 << 26 | 103 << 1 }; op.vd = vd; op.ra = ra; op.rb = rb; return op.opcode; }
+	inline u32 KOT(u32 li, bool aa = false, bool lk = false) { ppu_opcode_t op{ 0x3c << 26 }; op.li = li; op.aa = aa; op.lk = lk; return op.opcode; }
 
 	namespace implicts
 	{

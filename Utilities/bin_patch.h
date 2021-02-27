@@ -40,6 +40,9 @@ enum class patch_type
 	bef32,
 	bef64,
 	utf8, // Text of string (not null-terminated automatically)
+	func,
+	funcl,
+	dll,
 };
 
 class patch_engine

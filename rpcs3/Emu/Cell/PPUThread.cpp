@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "Utilities/JIT.h"
 #include "Utilities/StrUtil.h"
 #include "Crypto/sha1.h"
@@ -125,6 +125,7 @@ extern void ppu_unload_prx(const lv2_prx&);
 extern std::shared_ptr<lv2_prx> ppu_load_prx(const ppu_prx_object&, const std::string&);
 extern void ppu_execute_syscall(ppu_thread& ppu, u64 code);
 static bool ppu_break(ppu_thread& ppu, ppu_opcode_t op);
+extern void execute_HLE(ppu_thread& ppu, u64 code, bool lk);
 
 extern void do_cell_atomic_128_store(u32 addr, const void* to_write);
 
@@ -348,6 +349,17 @@ void ppu_reservation_fallback(ppu_thread& ppu)
 			return;
 		}
 	}
+}
+
+void ppu_interpreter_exec_single(ppu_thread& ppu, u32 op)
+{
+	const auto& table = g_ppu_interpreter_fast.get_table();
+
+	if (table[ppu_decode(op)](ppu, {op})) [[likely]]
+	{
+		ppu.cia += 4;
+	}
+	return;
 }
 
 static std::unordered_map<u32, u32>* s_ppu_toc;
@@ -2647,6 +2659,7 @@ bool ppu_initialize(const ppu_module& info, bool check_only)
 			{ "__dcbz", reinterpret_cast<u64>(+[](u32 addr){ alignas(64) static constexpr u8 z[128]{}; do_cell_atomic_128_store(addr, z); }) },
 			{ "__resupdate", reinterpret_cast<u64>(vm::reservation_update) },
 			{ "__resinterp", reinterpret_cast<u64>(ppu_reservation_fallback) },
+			{ "__exec_hle", (u64)&execute_HLE },
 		};
 
 		for (u64 index = 0; index < 1024; index++)

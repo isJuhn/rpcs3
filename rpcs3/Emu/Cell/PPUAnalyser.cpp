@@ -3746,6 +3746,10 @@ void ppu_acontext::FCFID(ppu_opcode_t op)
 {
 }
 
+void ppu_acontext::KOT(ppu_opcode_t op)
+{
+}
+
 #include <random>
 
 const bool s_tes = []()
