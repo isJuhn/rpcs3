@@ -985,6 +985,8 @@
     </ClCompile>
     <ClCompile Include="Emu\Cell\Modules\sys_crashdump.cpp">
       <Filter>Emu\Cell\Modules</Filter>
+    <ClCompile Include="Emu\IPC_socket.cpp">
+      <Filter>Emu</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1923,6 +1925,8 @@
     </ClInclude>
     <ClInclude Include="Loader\mself.hpp">
       <Filter>Loader</Filter>
+    <ClInclude Include="Emu\IPC_socket.h">
+      <Filter>Emu</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

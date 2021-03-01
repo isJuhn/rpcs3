@@ -46,6 +46,7 @@
 #include <charconv>
 
 #include "Utilities/JIT.h"
+#include "IPC_socket.h"
 
 #include "display_sleep_control.h"
 
@@ -1742,6 +1743,9 @@ void Emulator::Run(bool start_playtime)
 	{
 		disable_display_sleep();
 	}
+
+	auto ipc = g_fxo->get<ipc_server>();
+	
 }
 
 bool Emulator::Pause()
