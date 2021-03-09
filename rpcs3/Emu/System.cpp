@@ -1744,7 +1744,7 @@ void Emulator::Run(bool start_playtime)
 		disable_display_sleep();
 	}
 
-	auto ipc = g_fxo->get<ipc_server>();
+	auto ipc = g_fxo->init<ipc_server>();
 	
 }
 
