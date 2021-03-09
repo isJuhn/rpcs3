@@ -35,6 +35,8 @@
 
 #include "util/logs.hpp"
 #include "Emu/Memory/vm.h"
+#include "System.h"
+#include "rpcs3_version.h"
 #include "IPC_socket.h"
 
 LOG_CHANNEL(IPC);
@@ -151,7 +153,7 @@ int SocketIPC::StartSocket()
 		{
 #endif
 			fprintf(stderr, "IPC: An unrecoverable error happened! Shutting down...\n");
-			m_end = true;
+			
 			return -1;
 		}
 		}
@@ -160,8 +162,6 @@ int SocketIPC::StartSocket()
 
 void SocketIPC::operator()()
 {
-	m_end = false;
-
 	// we allocate once buffers to not have to do mallocs for each IPC
 	// request, as malloc is expansive when we optimize for µs.
 	m_ret_buffer = new char[MAX_IPC_RETURN_SIZE];
@@ -170,7 +170,7 @@ void SocketIPC::operator()()
 	if (StartSocket() < 0)
 		return;
 
-	while (true)
+	while (thread_ctrl::state() != thread_state::aborting)
 	{
 		// either int or ssize_t depending on the platform, so we have to
 		// use a bunch of auto
@@ -228,9 +228,19 @@ void SocketIPC::operator()()
 	return;
 }
 
+void SocketIPC::wake_up()
+{
+#ifdef _WIN32
+	WSACleanup();
+#else
+	unlink(m_socket_name);
+#endif
+	close_portable(m_sock);
+	close_portable(m_msgsock);
+}
+
 SocketIPC::~SocketIPC()
 {
-	m_end = true;
 #ifdef _WIN32
 	WSACleanup();
 #else
@@ -364,13 +374,46 @@ SocketIPC::IPCBuffer SocketIPC::ParseCommand(char* buf, char* ret_buffer, u32 bu
 		}
 		case MsgVersion:
 		{
-			/*char version[256] = {};
-			sprintf(version, "PCSX2 %u.%u.%u-%lld %s", PCSX2_VersionHi, PCSX2_VersionMid, PCSX2_VersionLo, SVN_REV, SVN_MODS ? "(modded)" : "");
+			char version[256] = {};
+			sprintf(version, "RPCS3 %s", rpcs3::get_version_and_branch().c_str());
 			version[255] = 0x00;
 			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
 				goto error;
 			memcpy(&ret_buffer[ret_cnt], version, 256);
-			ret_cnt += 256;*/
+			ret_cnt += 256;
+			break;
+		}
+		case MsgTitle:
+		{
+			char version[256] = {};
+			sprintf(version, "%s", Emu.GetTitle().c_str());
+			version[255] = 0x00;
+			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
+				goto error;
+			memcpy(&ret_buffer[ret_cnt], version, 256);
+			ret_cnt += 256;
+			break;
+		}
+		case MsgID:
+		{
+			char version[256] = {};
+			sprintf(version, "%s", Emu.GetTitleID().c_str());
+			version[255] = 0x00;
+			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
+				goto error;
+			memcpy(&ret_buffer[ret_cnt], version, 256);
+			ret_cnt += 256;
+			break;
+		}
+		case MsgUUID:
+		{
+			char version[256] = {};
+			sprintf(version, "%s", Emu.GetExecutableHash().c_str());
+			version[255] = 0x00;
+			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
+				goto error;
+			memcpy(&ret_buffer[ret_cnt], version, 256);
+			ret_cnt += 256;
 			break;
 		}
 		default:

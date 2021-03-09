@@ -21,7 +21,7 @@
 #include <windows.h>
 #endif
 
-class SocketIPC
+class SocketIPC : public need_wakeup
 {
 public:
 #ifdef _WIN32
@@ -81,7 +81,10 @@ public:
 		MsgWrite16 = 5,         /**< Write 16 bit value to memory. */
 		MsgWrite32 = 6,         /**< Write 32 bit value to memory. */
 		MsgWrite64 = 7,         /**< Write 64 bit value to memory. */
-		MsgVersion = 8,         /**< Returns PCSX2 version. */
+		MsgVersion = 8,         /**< Returns RPCS3 version. */
+		MsgTitle = 0xB,         /**< Returns the game title. */
+		MsgID = 0xC,            /**< Returns the game ID. */
+		MsgUUID = 0xD,          /**< Returns the game UUID. */
 		MsgUnimplemented = 0xFF /**< Unimplemented IPC message. */
 	};
 
@@ -179,12 +182,13 @@ public:
 
 public:
 	// Whether the socket processing thread should stop executing/is stopped.
-	bool m_end = true;
+	//bool m_end = true;
 
 	/* Initializers */
 	SocketIPC() noexcept;
 	SocketIPC(const SocketIPC&) = delete;
 	SocketIPC& operator=(const SocketIPC&) = delete;
+	void wake_up();
 	virtual ~SocketIPC();
 
 	static auto constexpr thread_name = "IPC Server"sv;
