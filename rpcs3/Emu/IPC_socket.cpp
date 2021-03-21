@@ -13,6 +13,7 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "IPC_socket.h"
 #include "stdafx.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +38,6 @@
 #include "Emu/Memory/vm.h"
 #include "System.h"
 #include "rpcs3_version.h"
-#include "IPC_socket.h"
 
 LOG_CHANNEL(IPC);
 
@@ -46,7 +46,8 @@ SocketIPC::SocketIPC() noexcept
 #ifdef _WIN32
 	WSADATA wsa;
 	struct sockaddr_in server;
-
+	m_sock = INVALID_SOCKET;
+	m_msgsock = INVALID_SOCKET;
 
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
@@ -383,36 +384,69 @@ SocketIPC::IPCBuffer SocketIPC::ParseCommand(char* buf, char* ret_buffer, u32 bu
 			ret_cnt += 256;
 			break;
 		}
+		case MsgStatus:
+		{
+			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 4, buf_size))
+				goto error;
+			EmuStatus res;
+			switch (Emu.GetStatus())
+			{
+			case system_state::running:
+				res = EmuStatus::Running;
+				break;
+			case system_state::paused:
+				res = EmuStatus::Paused;
+				break;
+			default:
+				res = EmuStatus::Shutdown;
+				break;
+			}
+			ToArray(ret_buffer, res, ret_cnt);
+			ret_cnt += 4;
+			buf_cnt += 4;
+			break;
+		}
 		case MsgTitle:
 		{
-			char version[256] = {};
-			sprintf(version, "%s", Emu.GetTitle().c_str());
-			version[255] = 0x00;
+			char title[256] = {};
+			sprintf(title, "%s", Emu.GetTitle().c_str());
+			title[255] = 0x00;
 			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
 				goto error;
-			memcpy(&ret_buffer[ret_cnt], version, 256);
+			memcpy(&ret_buffer[ret_cnt], title, 256);
 			ret_cnt += 256;
 			break;
 		}
 		case MsgID:
 		{
-			char version[256] = {};
-			sprintf(version, "%s", Emu.GetTitleID().c_str());
-			version[255] = 0x00;
+			char titleId[256] = {};
+			sprintf(titleId, "%s", Emu.GetTitleID().c_str());
+			titleId[255] = 0x00;
 			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
 				goto error;
-			memcpy(&ret_buffer[ret_cnt], version, 256);
+			memcpy(&ret_buffer[ret_cnt], titleId, 256);
 			ret_cnt += 256;
 			break;
 		}
 		case MsgUUID:
 		{
-			char version[256] = {};
-			sprintf(version, "%s", Emu.GetExecutableHash().c_str());
-			version[255] = 0x00;
+			char hash[256] = {};
+			sprintf(hash, "%s", Emu.GetExecutableHash().c_str());
+			hash[255] = 0x00;
 			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
 				goto error;
-			memcpy(&ret_buffer[ret_cnt], version, 256);
+			memcpy(&ret_buffer[ret_cnt], hash, 256);
+			ret_cnt += 256;
+			break;
+		}
+		case MsgGameVersion:
+		{
+			char gameVersion[256] = {};
+			sprintf(gameVersion, "%s", Emu.GetAppVersion().c_str());
+			gameVersion[255] = 0x00;
+			if (!SafetyChecks(buf_cnt, 0, ret_cnt, 256, buf_size))
+				goto error;
+			memcpy(&ret_buffer[ret_cnt], gameVersion, 256);
 			ret_cnt += 256;
 			break;
 		}

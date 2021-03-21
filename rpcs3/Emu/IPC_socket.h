@@ -17,9 +17,11 @@
 
 #include "Utilities/Thread.h"
 #ifdef _WIN32
-#include <WinSock2.h>
-#include <windows.h>
+//#include <WinSock2.h>
+//#include <windows.h>
 #endif
+
+typedef unsigned long long SOCKET;
 
 class SocketIPC : public need_wakeup
 {
@@ -28,9 +30,9 @@ public:
 	// windows claim to have support for AF_UNIX sockets but that is a blatant lie,
 	// their SDK won't even run their own examples, so we go on TCP sockets.
 #define PORT 28011
-	SOCKET m_sock = INVALID_SOCKET;
+	SOCKET m_sock;// = INVALID_SOCKET;
 	// the message socket used in thread's accept().
-	SOCKET m_msgsock = INVALID_SOCKET;
+	SOCKET m_msgsock;// = INVALID_SOCKET;
 #else
 	// absolute path of the socket. Stored in XDG_RUNTIME_DIR, if unset /tmp
 	char* m_socket_name;
@@ -85,9 +87,20 @@ public:
 		MsgTitle = 0xB,         /**< Returns the game title. */
 		MsgID = 0xC,            /**< Returns the game ID. */
 		MsgUUID = 0xD,          /**< Returns the game UUID. */
+		MsgGameVersion = 0xE,   /**< Returns the game verion. */
+		MsgStatus = 0xF,        /**< Returns the emulator status. */
 		MsgUnimplemented = 0xFF /**< Unimplemented IPC message. */
 	};
 
+	/**
+	 * Emulator status enum. @n
+	 * A list of possible emulator statuses. @n
+	 */
+	enum EmuStatus : uint32_t {
+		Running = 0,            /**< Game is running */
+		Paused = 1,             /**< Game is paused */
+		Shutdown = 2,           /**< Game is shutdown */
+	};
 
 	/**
 	 * IPC message buffer.
@@ -194,5 +207,3 @@ public:
 	static auto constexpr thread_name = "IPC Server"sv;
 
 }; // class SocketIPC
-
-using ipc_server = named_thread<SocketIPC>;

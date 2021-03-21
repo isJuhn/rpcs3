@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <Emu/IPC_socket.h>
 
 u64 get_system_time();
 u64 get_guest_system_time();
@@ -87,6 +88,7 @@ class Emulator final
 	std::string m_game_dir{"PS3_GAME"};
 	std::string m_usr{"00000001"};
 	u32 m_usrid{1};
+	named_thread<SocketIPC> m_ipc_server;
 
 	bool m_force_global_config = false;
 
