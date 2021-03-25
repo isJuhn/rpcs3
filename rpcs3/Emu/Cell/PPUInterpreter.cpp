@@ -32,6 +32,15 @@ extern void do_cell_atomic_128_store(u32 addr, const void* to_write);
 
 inline u64 dup32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
+LOG_CHANNEL(ppu_int);
+struct ptr_info {
+	s32 offset;
+	u32 cia;
+};
+
+std::unordered_map<u32, std::unordered_map<u32, ptr_info>> ptr_map{};
+std::mutex ptr_mutex{};
+
 // Write values to CR field
 inline void ppu_cr_set(ppu_thread& ppu, u32 field, bool le, bool gt, bool eq, bool so)
 {
@@ -3805,6 +3814,30 @@ bool ppu_interpreter::STVX(ppu_thread& ppu, ppu_opcode_t op)
 {
 	const u64 addr = (op.ra ? ppu.gpr[op.ra] + ppu.gpr[op.rb] : ppu.gpr[op.rb]) & ~0xfull;
 	vm::_ref<v128>(vm::cast(addr)) = ppu.vr[op.vs];
+	// Put this piece of code in the correct instruction that writes a camera value
+	/*if (ppu.cia == 0x23C520) // Enter the cia for the instruction that writes a camera value
+	{
+		std::function<bool(u32, u32)> visit = [&](u32 curr, u32 level) -> bool
+		{
+			if (curr < 0x11E8F68) // Enter the elf size, e.g. the last address you can see in IDA/Ghidra
+				return true;
+			if (!ptr_map.contains(curr) || level > 16)
+				return false;
+			auto base = ptr_map[curr];
+			bool ret = false;
+			for (std::pair<u32, ptr_info> ptr_info : base)
+			{
+				if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit(ptr_info.first, level + 1))
+				{
+					ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+					return true;
+				}
+			}
+			return ret;
+		};
+		visit(ppu.gpr[27], 0); // Enter the ppu register which contains the base address on the camera value, in this case r27
+		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r5: 0x%x, r27: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[5], ppu.gpr[27]); // Log important stuff like base address and offset of camera value
+	}*/
 	return true;
 }
 
@@ -4509,7 +4542,22 @@ bool ppu_interpreter::DCBZ(ppu_thread& ppu, ppu_opcode_t op)
 bool ppu_interpreter::LWZ(ppu_thread& ppu, ppu_opcode_t op)
 {
 	const u64 addr = op.ra ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
-	ppu.gpr[op.rd] = ppu_feed_data<u32>(ppu, addr);
+	const u32 value = ppu_feed_data<u32>(ppu, addr);
+	ppu.gpr[op.rd] = value;
+	/*if (value >= 0x11E8F68 && value < 0x50000000) // Enter size of elf and some arbitrary upper bound for base addresses, upper bound can be removed if you have no idea
+	{
+		std::unique_lock lock(ptr_mutex);
+		if (!ptr_map.contains(value))
+		{
+			std::unordered_map<u32, ptr_info> inner{};
+			inner[static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia };
+			ptr_map[value] = inner;
+		}
+		else if (!ptr_map[value].contains(static_cast<u32>(ppu.gpr[op.ra])))
+		{
+			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia };
+		}
+	}*/
 	return true;
 }
 
@@ -4673,6 +4721,30 @@ bool ppu_interpreter::STFS(ppu_thread& ppu, ppu_opcode_t op)
 {
 	const u64 addr = op.ra ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
 	vm::_ref<f32>(vm::cast(addr)) = static_cast<float>(ppu.fpr[op.frs]);
+	// Another example
+	/*if (ppu.cia == 0x155028)
+	{
+		std::function<bool(u32, u32)> visit = [&](u32 curr, u32 level) -> bool
+		{
+			if (curr < 0x11E8F68)
+				return true;
+			if (!ptr_map.contains(curr) || level > 16)
+				return false;
+			auto base = ptr_map[curr];
+			bool ret = false;
+			for (std::pair<u32, ptr_info> ptr_info : base)
+			{
+				if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit(ptr_info.first, level + 1))
+				{
+					ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+					return true;
+				}
+			}
+			return ret;
+		};
+		visit(ppu.gpr[3], 0);
+		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r3: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[3]);
+	}*/
 	return true;
 }
 
