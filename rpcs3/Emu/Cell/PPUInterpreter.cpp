@@ -363,6 +363,38 @@ struct ptr_info {
 std::unordered_map<u32, std::unordered_map<u32, ptr_info>> ptr_map{};
 std::mutex ptr_mutex{};
 
+const u32 ELF_SIZE = 0x166BE87;
+const u32 STFS_ADDR = 0x7a2420;
+
+bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
+{
+	if (curr < ELF_SIZE)
+		return true;
+	if (!ptr_map.contains(curr) || level >= maxlevel)
+		return false;
+	auto base = ptr_map[curr];
+	bool ret = false;
+	for (std::pair<u32, ptr_info> ptr_info : base)
+	{
+		if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit_internal(ppu, ptr_info.first, level + 1, maxlevel))
+		{
+			ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+			return true;
+		}
+	}
+	return ret;
+};
+
+bool visit_ptr_map(ppu_thread& ppu, u32 curr)
+{
+	for (int i = 1; i < 12; i++)
+	{
+		if (visit_internal(ppu, curr, 0, i))
+			return true;
+	}
+	return false;
+}
+
 // Write values to CR field
 inline void ppu_cr_set(ppu_thread& ppu, u32 field, bool le, bool gt, bool eq, bool so)
 {
@@ -520,35 +552,6 @@ auto ppu_feed_data(ppu_thread& ppu, u64 addr)
 	}
 
 	return value;
-}
-
-bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
-{
-	if (curr < 0x166BE87)
-		return true;
-	if (!ptr_map.contains(curr) || level >= maxlevel)
-		return false;
-	auto base = ptr_map[curr];
-	bool ret = false;
-	for (std::pair<u32, ptr_info> ptr_info : base)
-	{
-		if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit_internal(ppu, ptr_info.first, level + 1, maxlevel))
-		{
-			ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
-			return true;
-		}
-	}
-	return ret;
-};
-
-bool visit_ptr_map(ppu_thread& ppu, u32 curr)
-{
-	for (int i = 1; i < 12; i++)
-	{
-		if (visit_internal(ppu, curr, 0, i))
-			return true;
-	}
-	return false;
 }
 
 // Push called address to custom call history for debugging
@@ -5837,7 +5840,7 @@ auto LWZ()
 	const u64 addr = op.ra || 1 ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
 	const u32 value = ppu_feed_data<u32, Flags...>(ppu, addr);
 	ppu.gpr[op.rd] = value;
-	/*if (value >= 0x166BE87 && value) // Enter size of elf and some arbitrary upper bound for base addresses, upper bound can be removed if you have no idea
+	if (value >= ELF_SIZE && value) // Enter size of elf and some arbitrary upper bound for base addresses, upper bound can be removed if you have no idea
 	{
 		std::unique_lock lock(ptr_mutex);
 		if (!ptr_map.contains(value))
@@ -5850,7 +5853,7 @@ auto LWZ()
 		{
 			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia };
 		}
-	}*/
+	}
 	};
 	RETURN_(ppu, op);
 }
@@ -6138,7 +6141,7 @@ auto STFS()
 	{
 		std::function<bool(u32, u32)> visit = [&](u32 curr, u32 level) -> bool
 		{
-			if (curr < 0x166BE87)
+			if (curr < ELF_SIZE)
 				return true;
 			if (!ptr_map.contains(curr) || level > 12)
 				return false;
@@ -6157,11 +6160,11 @@ auto STFS()
 		visit(ppu.gpr[31], 0);
 		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
 	}*/
-	/*if (ppu.cia == 0x5B77B8)
+	if (ppu.cia == STFS_ADDR)
 	{
 		visit_ptr_map(ppu, ppu.gpr[31]);
 		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
-	}*/
+	}
 	};
 	RETURN_(ppu, op);
 }
