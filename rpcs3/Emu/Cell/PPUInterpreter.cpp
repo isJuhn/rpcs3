@@ -366,6 +366,7 @@ std::mutex ptr_mutex{};
 const u32 ELF_SIZE = 0x166BE87;
 const u32 STFS_ADDR = 0x7a2420;
 
+template <ppu_exec_bit... Flags>
 bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
 {
 	if (curr < ELF_SIZE)
@@ -376,7 +377,7 @@ bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
 	bool ret = false;
 	for (std::pair<u32, ptr_info> ptr_info : base)
 	{
-		if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit_internal(ppu, ptr_info.first, level + 1, maxlevel))
+		if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32, Flags...>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit_internal<Flags...>(ppu, ptr_info.first, level + 1, maxlevel))
 		{
 			ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
 			return true;
@@ -385,11 +386,12 @@ bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
 	return ret;
 };
 
+template <ppu_exec_bit... Flags>
 bool visit_ptr_map(ppu_thread& ppu, u32 curr)
 {
 	for (int i = 1; i < 12; i++)
 	{
-		if (visit_internal(ppu, curr, 0, i))
+		if (visit_internal<Flags...>(ppu, curr, 0, i))
 			return true;
 	}
 	return false;
@@ -6162,7 +6164,7 @@ auto STFS()
 	}*/
 	if (ppu.cia == STFS_ADDR)
 	{
-		visit_ptr_map(ppu, ppu.gpr[31]);
+		visit_ptr_map<Flags...>(ppu, ppu.gpr[31]);
 		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
 	}
 	};
