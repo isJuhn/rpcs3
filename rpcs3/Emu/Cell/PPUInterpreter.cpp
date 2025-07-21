@@ -355,15 +355,22 @@ extern void do_cell_atomic_128_store(u32 addr, const void* to_write);
 inline u64 dup32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
 LOG_CHANNEL(ppu_int);
+
+enum chain_type : u32 {
+	Deref = 1,
+	Offset = 2,
+};
+
 struct ptr_info {
 	s32 offset;
 	u32 cia;
+	chain_type chain_type;
 };
 
 std::unordered_map<u32, std::unordered_map<u32, ptr_info>> ptr_map{};
 std::mutex ptr_mutex{};
 
-const u32 ELF_SIZE = 0x166BE87;
+const u32 ELF_SIZE = 0x1AB9430;
 const u32 STFS_ADDR = 0x7a2420;
 
 template <ppu_exec_bit... Flags>
@@ -377,10 +384,18 @@ bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
 	bool ret = false;
 	for (std::pair<u32, ptr_info> ptr_info : base)
 	{
-		if (ptr_info.first != curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && ppu_feed_data<u32, Flags...>(ppu, ptr_info.first + ptr_info.second.offset) == curr && visit_internal<Flags...>(ppu, ptr_info.first, level + 1, maxlevel))
+		if (ptr_info.first != curr)
 		{
-			ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
-			return true;
+			if (ptr_info.second.chain_type == chain_type::Deref && ppu_feed_data<u32, Flags...>(ppu, ptr_info.first + ptr_info.second.offset) == curr && vm::check_addr(ptr_info.first + ptr_info.second.offset) && visit_internal<Flags...>(ppu, ptr_info.first, level + 1, maxlevel))
+			{
+				ppu_int.error("result: 0x%x, from: *(0x%x + 0x%x), at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+				return true;
+			}
+			else if (ptr_info.second.chain_type == chain_type::Offset && visit_internal<Flags...>(ppu, ptr_info.first, level + 1, maxlevel))
+			{
+				ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+				return true;
+			}
 		}
 	}
 	return ret;
@@ -3220,7 +3235,22 @@ auto ADDI()
 		return ppu_exec_select<Flags...>::template select<>();
 
 	static const auto exec = [](ppu_thread& ppu, ppu_opcode_t op) {
-	ppu.gpr[op.rd] = op.ra ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
+	const auto value = op.ra ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
+	ppu.gpr[op.rd] = value;
+	if (value >= ELF_SIZE)
+	{
+		std::unique_lock lock(ptr_mutex);
+		if (!ptr_map.contains(value))
+		{
+			std::unordered_map<u32, ptr_info> inner{};
+			inner[static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Offset };
+			ptr_map[value] = inner;
+		}
+		else if (!ptr_map[value].contains(static_cast<u32>(ppu.gpr[op.ra])))
+		{
+			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Offset };
+		}
+	}
 	};
 	RETURN_(ppu, op);
 }
@@ -5842,18 +5872,18 @@ auto LWZ()
 	const u64 addr = op.ra || 1 ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
 	const u32 value = ppu_feed_data<u32, Flags...>(ppu, addr);
 	ppu.gpr[op.rd] = value;
-	if (value >= ELF_SIZE && value) // Enter size of elf and some arbitrary upper bound for base addresses, upper bound can be removed if you have no idea
+	if (value >= ELF_SIZE)
 	{
 		std::unique_lock lock(ptr_mutex);
 		if (!ptr_map.contains(value))
 		{
 			std::unordered_map<u32, ptr_info> inner{};
-			inner[static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia };
+			inner[static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Deref };
 			ptr_map[value] = inner;
 		}
 		else if (!ptr_map[value].contains(static_cast<u32>(ppu.gpr[op.ra])))
 		{
-			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia };
+			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Deref };
 		}
 	}
 	};
@@ -6129,7 +6159,7 @@ auto LFDU()
 	};
 	RETURN_(ppu, op);
 }
-
+static int counter = 0;
 template <u32 Build, ppu_exec_bit... Flags>
 auto STFS()
 {
@@ -6162,10 +6192,11 @@ auto STFS()
 		visit(ppu.gpr[31], 0);
 		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
 	}*/
-	if (ppu.cia == STFS_ADDR)
+	if (ppu.cia == STFS_ADDR && (++counter % 3 == 0))
 	{
 		visit_ptr_map<Flags...>(ppu, ppu.gpr[31]);
-		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
+		ppu_int.error("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
+		ppu.add_remove_flags(cpu_flag::dbg_pause, {});
 	}
 	};
 	RETURN_(ppu, op);
