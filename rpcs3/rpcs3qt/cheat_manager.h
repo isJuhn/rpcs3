@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QComboBox>
 #include <QPushButton>
+#include <QTreeWidget>
 
 #include <string>
 #include <vector>
@@ -71,6 +72,8 @@ protected:
 	bool convert_and_search();
 	template <typename T>
 	std::pair<bool, bool> convert_and_set(u32 offset);
+
+	void breadth_search(QTreeWidget* tree, u32 ptr, s32 max_depth);
 
 protected:
 	QTableWidget* tbl_cheats = nullptr;

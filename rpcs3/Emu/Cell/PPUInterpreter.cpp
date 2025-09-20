@@ -356,21 +356,10 @@ inline u64 dup32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
 LOG_CHANNEL(ppu_int);
 
-enum chain_type : u32 {
-	Deref = 1,
-	Offset = 2,
-};
+extern std::unordered_map<u32, std::unordered_map<u32, ptr_info>> ptr_trace_map{};
+extern std::mutex ptr_trace_mutex{};
 
-struct ptr_info {
-	s32 offset;
-	u32 cia;
-	chain_type chain_type;
-};
-
-std::unordered_map<u32, std::unordered_map<u32, ptr_info>> ptr_map{};
-std::mutex ptr_mutex{};
-
-const u32 ELF_SIZE = 0x1AB9430;
+const u32 ELF_SIZE = 0x134E600;
 const u32 STFS_ADDR = 0x7a2420;
 
 template <ppu_exec_bit... Flags>
@@ -378,9 +367,9 @@ bool visit_internal(ppu_thread& ppu, u32 curr, u32 level, u32 maxlevel)
 {
 	if (curr < ELF_SIZE)
 		return true;
-	if (!ptr_map.contains(curr) || level >= maxlevel)
+	if (!ptr_trace_map.contains(curr) || level >= maxlevel)
 		return false;
-	auto base = ptr_map[curr];
+	auto base = ptr_trace_map[curr];
 	bool ret = false;
 	for (std::pair<u32, ptr_info> ptr_info : base)
 	{
@@ -3236,19 +3225,20 @@ auto ADDI()
 
 	static const auto exec = [](ppu_thread& ppu, ppu_opcode_t op) {
 	const auto value = op.ra ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
+	const auto base = ppu.gpr[op.ra];
 	ppu.gpr[op.rd] = value;
 	if (value >= ELF_SIZE)
 	{
-		std::unique_lock lock(ptr_mutex);
-		if (!ptr_map.contains(value))
+		std::unique_lock lock(ptr_trace_mutex);
+		if (!ptr_trace_map.contains(value))
 		{
 			std::unordered_map<u32, ptr_info> inner{};
-			inner[static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Offset };
-			ptr_map[value] = inner;
+			inner[static_cast<u32>(base)] = { op.simm16, ppu.cia, chain_type::Offset };
+			ptr_trace_map[value] = inner;
 		}
-		else if (!ptr_map[value].contains(static_cast<u32>(ppu.gpr[op.ra])))
+		else if (!ptr_trace_map[value].contains(static_cast<u32>(base)))
 		{
-			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Offset };
+			ptr_trace_map[value][static_cast<u32>(base)] = { op.simm16, ppu.cia, chain_type::Offset };
 		}
 	}
 	};
@@ -5871,19 +5861,20 @@ auto LWZ()
 	static const auto exec = [](ppu_thread& ppu, ppu_opcode_t op) {
 	const u64 addr = op.ra || 1 ? ppu.gpr[op.ra] + op.simm16 : op.simm16;
 	const u32 value = ppu_feed_data<u32, Flags...>(ppu, addr);
+	const auto base = ppu.gpr[op.ra];
 	ppu.gpr[op.rd] = value;
 	if (value >= ELF_SIZE)
 	{
-		std::unique_lock lock(ptr_mutex);
-		if (!ptr_map.contains(value))
+		std::unique_lock lock(ptr_trace_mutex);
+		if (!ptr_trace_map.contains(value))
 		{
 			std::unordered_map<u32, ptr_info> inner{};
-			inner[static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Deref };
-			ptr_map[value] = inner;
+			inner[static_cast<u32>(base)] = { op.simm16, ppu.cia, chain_type::Deref };
+			ptr_trace_map[value] = inner;
 		}
-		else if (!ptr_map[value].contains(static_cast<u32>(ppu.gpr[op.ra])))
+		else if (!ptr_trace_map[value].contains(static_cast<u32>(base)))
 		{
-			ptr_map[value][static_cast<u32>(ppu.gpr[op.ra])] = { op.simm16, ppu.cia, chain_type::Deref };
+			ptr_trace_map[value][static_cast<u32>(base)] = { op.simm16, ppu.cia, chain_type::Deref };
 		}
 	}
 	};
@@ -6192,11 +6183,12 @@ auto STFS()
 		visit(ppu.gpr[31], 0);
 		ppu_int.fatal("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
 	}*/
-	if (ppu.cia == STFS_ADDR && (++counter % 3 == 0))
+	if (ppu.cia == STFS_ADDR && (++counter == 3))
 	{
-		visit_ptr_map<Flags...>(ppu, ppu.gpr[31]);
+		/*visit_ptr_map<Flags...>(ppu, ppu.gpr[31]);
 		ppu_int.error("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
-		ppu.add_remove_flags(cpu_flag::dbg_pause, {});
+		ppu.add_remove_flags(cpu_flag::dbg_pause, {});*/
+		ppu_int.error("cia: 0x%x, lr: 0x%x, ctr: 0x%x, r31: 0x%x", ppu.cia, ppu.lr, ppu.ctr, ppu.gpr[31]);
 	}
 	};
 	RETURN_(ppu, op);

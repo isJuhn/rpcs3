@@ -30,6 +30,9 @@ LOG_CHANNEL(log_cheat, "Cheat");
 
 cheat_manager_dialog* cheat_manager_dialog::inst = nullptr;
 
+extern std::unordered_map<u32, std::unordered_map<u32, ptr_info>> ptr_trace_map;
+extern std::mutex ptr_trace_mutex;
+
 YAML::Emitter& operator<<(YAML::Emitter& out, const cheat_info& rhs)
 {
 	std::string type_formatted;
@@ -549,6 +552,35 @@ cheat_manager_dialog::cheat_manager_dialog(QWidget* parent)
 	grp_add_cheat->setLayout(grp_add_cheat_layout);
 	main_layout->addWidget(grp_add_cheat);
 
+	QGroupBox* grp_ptr_trace = new QGroupBox(tr("Pointer trace"));
+	QVBoxLayout* grp_ptr_trace_layout = new QVBoxLayout();
+	QHBoxLayout* grp_ptr_trace_sub_layout = new QHBoxLayout();
+	QPushButton* btn_trace_ptr = new QPushButton(tr("Trace pointer"));
+	//btn_trace_ptr->setEnabled(false);
+	QLineEdit* ptr_trace_value = new QLineEdit();
+
+	grp_ptr_trace_sub_layout->addWidget(ptr_trace_value);
+	grp_ptr_trace_sub_layout->addWidget(btn_trace_ptr);
+	grp_ptr_trace_layout->addLayout(grp_ptr_trace_sub_layout);
+	QTreeWidget* ptr_trace_tree = new QTreeWidget(this);
+	ptr_trace_tree->setColumnCount(4);
+	QStringList header_labels = QStringList({ tr("Address"), tr("Traced from"), tr("Instruction address"), tr("Comment")});
+	ptr_trace_tree->setHeaderLabels(header_labels);
+	grp_ptr_trace_layout->addWidget(ptr_trace_tree);
+	grp_ptr_trace->setLayout(grp_ptr_trace_layout);
+	main_layout->addWidget(grp_ptr_trace);
+
+	QTreeWidgetItem* top = new QTreeWidgetItem(ptr_trace_tree, { tr("0x123"), tr("0x100 + 0x23"), tr("0x10100")});
+	QTreeWidgetItem* middle = new QTreeWidgetItem(top, { tr("0x100"), tr("*(0x10 + 0x4)"), tr("0x10200") });
+	QTreeWidgetItem* middle2 = new QTreeWidgetItem(top, { tr("0x100"), tr("*(0x400 + 0x56)"), tr("0x10300") });
+	QTreeWidgetItem* bottom = new QTreeWidgetItem(middle2, { tr("0x400"), tr("*(0x20 + 0x10)"), tr("0x10400") });
+
+	connect(btn_trace_ptr, &QPushButton::clicked, [this, ptr_trace_tree, ptr_trace_value](bool /*checked*/)
+	{
+		ptr_trace_tree->clear();
+		breadth_search(ptr_trace_tree, ptr_trace_value->text().toUInt(nullptr, 16), 12);
+	});
+
 	setLayout(main_layout);
 
 	// Edit/Manage UI
@@ -1065,4 +1097,104 @@ QString cheat_manager_dialog::get_localized_cheat_type(cheat_type type)
 	std::string type_formatted;
 	fmt::append(type_formatted, "%s", type);
 	return QString::fromStdString(type_formatted);
+}
+
+const u32 ELF_SIZE = 0x1AB9430;
+
+/*template<typename T>
+QTreeWidget* visit_internal(T& parent, u32 curr, u32 level, u32 maxlevel)
+{
+	if (curr < ELF_SIZE)
+		return true;
+	if (!ptr_trace_map.contains(curr) || level >= maxlevel)
+		return false;
+	auto base = ptr_trace_map[curr];
+	bool ret = false;
+	for (std::pair<u32, ptr_info> ptr_info : base)
+	{
+		if (ptr_info.first != curr)
+		{
+			if (ptr_info.second.chain_type == chain_type::Deref && vm::check_addr(ptr_info.first + ptr_info.second.offset) && vm::_ref<u32>(vm::cast(ptr_info.first + ptr_info.second.offset)) == curr && visit_internal(parent, ptr_info.first, level + 1, maxlevel))
+			{
+				//ppu_int.error("result: 0x%x, from: *(0x%x + 0x%x), at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+				return true;
+			}
+			else if (ptr_info.second.chain_type == chain_type::Offset && visit_internal(parent, ptr_info.first, level + 1, maxlevel))
+			{
+				//ppu_int.error("result: 0x%x, from: 0x%x + 0x%x, at 0x%x", curr, ptr_info.first, ptr_info.second.offset, ptr_info.second.cia);
+				return true;
+			}
+		}
+	}
+	return ret;
+};
+
+QTreeWidget* visit_ptr_map(QTreeWidget& parent, u32 curr)
+{
+	for (int i = 1; i < 12; i++)
+	{
+		if (visit_internal(parent, curr, 0, i))
+			return true;
+	}
+	return false;
+}*/
+
+void cheat_manager_dialog::breadth_search(QTreeWidget* tree, u32 ptr, s32 max_depth)
+{
+	if (!ptr_trace_map.contains(ptr))
+		return;
+
+	std::vector<std::pair<u32, QTreeWidgetItem*>> search_vector {};
+	const auto& base = ptr_trace_map[ptr];
+	for (const std::pair<u32, ptr_info>& ptr_info : base)
+	{
+		if (ptr_info.second.chain_type == chain_type::Deref)
+		{
+			if (!vm::check_addr(ptr_info.first + ptr_info.second.offset) || vm::_ref<u32>(vm::cast(ptr_info.first + ptr_info.second.offset)) != ptr)
+				continue;
+		}
+		QString address = QString::number(ptr, 16);
+		QString offset = QString::asprintf(ptr_info.second.chain_type == chain_type::Deref ? "*(0x%x + 0x%x)" : "0x%x + 0x%x", ptr_info.first, ptr_info.second.offset);
+		QString cia = QString::number(ptr_info.second.cia, 16);
+		QTreeWidgetItem* item = new QTreeWidgetItem(tree, {address, offset, cia});
+		search_vector.emplace_back(ptr_info.first , item);
+	}
+
+	s32 depth = 0;
+	while (++depth < max_depth && search_vector.size() > 0)
+	{
+		std::vector<std::pair<u32, QTreeWidgetItem*>> new_addresses_to_search{};
+
+		for (const auto& item : search_vector)
+		{
+			const auto& base_ptr = ptr_trace_map[item.first];
+			for (const std::pair<u32, ptr_info>& ptr_info : base_ptr)
+			{
+				if (ptr_info.second.chain_type == chain_type::Deref)
+				{
+					if (!vm::check_addr(ptr_info.first + ptr_info.second.offset) || vm::_ref<u32>(vm::cast(ptr_info.first + ptr_info.second.offset)) != item.first)
+						continue;
+				}
+				QString address = QString::number(item.first, 16);
+				QString offset = QString::asprintf(ptr_info.second.chain_type == chain_type::Deref ? "*(0x%x + 0x%x)" : "0x%x + 0x%x", ptr_info.first, ptr_info.second.offset);
+				QString cia = QString::number(ptr_info.second.cia, 16);
+				QTreeWidgetItem* tree_item = new QTreeWidgetItem(item.second, { address, offset, cia });
+				if (ptr_info.first < ELF_SIZE)
+				{
+					QTreeWidgetItem* color_item = tree_item;
+					while (color_item != nullptr)
+					{
+						color_item->setBackground(0, QBrush(Qt::GlobalColor::green));
+						color_item->setText(3, "0");
+						color_item = color_item->parent();
+					}
+				}
+				new_addresses_to_search.emplace_back(ptr_info.first, tree_item);
+			}
+		}
+
+		search_vector = new_addresses_to_search;
+	}
+
+	tree->sortByColumn(3, Qt::SortOrder::DescendingOrder);
 }

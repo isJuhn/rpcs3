@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PPUOpcodes.h"
+#include <mutex>
 
 class ppu_thread;
 
@@ -41,4 +42,15 @@ struct ppu_interpreter_rt : ppu_interpreter_rt_base
 
 private:
 	ppu_decoder<ppu_interpreter_t<ppu_intrp_func_t>, ppu_intrp_func_t> table;
+};
+
+enum chain_type : u32 {
+	Deref = 1,
+	Offset = 2,
+};
+
+struct ptr_info {
+	s32 offset;
+	u32 cia;
+	chain_type chain_type;
 };
