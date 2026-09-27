@@ -15,9 +15,10 @@ namespace rsx
 		{
 			RSX(ctx)->sync();
 
-			// Write ref+get (get will be written again with the same value at command end)
+			// Write ref+get. GET must already be past this command when REF becomes visible (HW behaviour),
+			// get_pos() points at this method's argument, so +4 is the end of the command.
 			auto& dma = *vm::_ptr<RsxDmaControl>(RSX(ctx)->dma_address);
-			dma.get.release(RSX(ctx)->fifo_ctrl->get_pos());
+			dma.get.release(RSX(ctx)->fifo_ctrl->get_pos() + 4);
 			dma.ref.store(arg);
 		}
 
@@ -133,6 +134,11 @@ namespace rsx
 				// HW flip synchronization related, 1 is not written without display queue command (TODO: make it behave as real hw)
 				arg = 1;
 			}
+
+			// On HW the release is executed by the puller after the pusher has fetched the command,
+			// so GET is already past this command when the label becomes visible.
+			// get_pos() points at this method's argument, so +4 is the end of the command.
+			vm::_ptr<RsxDmaControl>(RSX(ctx)->dma_address)->get.release(RSX(ctx)->fifo_ctrl->get_pos() + 4);
 
 			util::write_gcm_label<false, true>(ctx, reg, addr, arg);
 		}

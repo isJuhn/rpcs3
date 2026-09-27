@@ -786,6 +786,10 @@ namespace rsx
 			}
 
 			const u32 val = (arg & 0xff00ff00) | ((arg & 0xff) << 16) | ((arg >> 16) & 0xff);
+
+			// Like NV406E semaphore_release: GET is past this command on HW when the label becomes visible
+		    vm::_ptr<RsxDmaControl>(RSX(ctx)->dma_address)->get.release(RSX(ctx)->fifo_ctrl->get_pos() + 4);
+
 			util::write_gcm_label<true, true>(ctx, reg, addr, val);
 		}
 
